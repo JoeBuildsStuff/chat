@@ -174,6 +174,25 @@ export default function Chat() {
                       p: ({ node, ...props }) => (
                         <p className="whitespace-pre-wrap" {...props} />
                       ),
+                      ul: ({ node, ...props }) => (
+                        <ul
+                          className="-mt-1 list-disc space-y-2 pl-8"
+                          {...props}
+                        />
+                      ),
+                      ol: ({ node, ...props }) => (
+                        <ol
+                          className="-mt-1 list-decimal space-y-2 pl-8"
+                          {...props}
+                        />
+                      ),
+                      li: ({ node, ...props }) => (
+                        <li
+                          className="whitespace-normal break-words"
+                          {...props}
+                        />
+                      ),
+
                       code: ({
                         node,
                         //@ts-ignore
@@ -197,24 +216,6 @@ export default function Chat() {
                           </code>
                         );
                       },
-                      ul: ({ node, ...props }) => (
-                        <ul
-                          className="-mt-1 list-disc space-y-2 pl-8"
-                          {...props}
-                        />
-                      ),
-                      ol: ({ node, ...props }) => (
-                        <ol
-                          className="-mt-1 list-decimal space-y-2 pl-8"
-                          {...props}
-                        />
-                      ),
-                      li: ({ node, ...props }) => (
-                        <li
-                          className="whitespace-normal break-words"
-                          {...props}
-                        />
-                      ),
                     }}
                   >
                     {message.content}
