@@ -28,11 +28,11 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
   };
 
   return (
-    <div className="relative flex flex-col rounded-lg my-2">
-      <div className="text-text-300 absolute pl-3 pt-2.5 text-xs">
+    <div className="relative flex flex-col rounded-lg my-2 bg-primary-foreground border">
+      <div className="text-text-300 absolute pl-3 pt-2.5 text-xs ">
         {language}
       </div>
-      <div className="pointer-events-none sticky z-20 my-0.5 ml-0.5 flex items-center justify-end px-1.5 py-1 mix-blend-luminosity top-0">
+      <div className=" pointer-events-none sticky z-20 my-0.5 ml-0.5 flex items-center justify-end px-1.5 py-1 mix-blend-luminosity top-0">
         <div className="from-bg-300/90 to-bg-300/70 pointer-events-auto rounded-md bg-gradient-to-b p-0.5 backdrop-blur-md">
           <button
             onClick={handleCopy}
@@ -191,7 +191,7 @@ export default function Chat() {
                           />
                         ) : (
                           <code
-                            className="bg-gray-200 text-red-500 px-1 rounded"
+                            className="bg-secondary-foreground text-secondary px-1 rounded-sm"
                             {...props}
                           >
                             {children}
