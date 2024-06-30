@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "./ui/textarea";
+import { CornerRightUp } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -95,7 +97,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] p-4 max-w-3xl mx-auto">
-      <div className="flex-grow overflow-y-auto mb-4">
+      <div className="flex-grow overflow-y-auto mb-4 pb-4">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -110,7 +112,35 @@ export default function Chat() {
                   : "bg-secondary text-secondary-foreground"
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {message.role === "user" ? (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              ) : (
+                <ReactMarkdown
+                  components={{
+                    p: ({ node, ...props }) => (
+                      <p className="whitespace-pre-wrap" {...props} />
+                    ),
+                    pre: ({ node, ...props }) => (
+                      <pre
+                        className="bg-gray-800 text-white p-2 rounded"
+                        {...props}
+                      />
+                    ),
+                    //@ts-ignore
+                    code: ({ node, inline, ...props }) =>
+                      inline ? (
+                        <code
+                          className="bg-gray-200 text-red-500 px-1 rounded"
+                          {...props}
+                        />
+                      ) : (
+                        <code {...props} />
+                      ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
         ))}
@@ -123,10 +153,16 @@ export default function Chat() {
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Type your message here"
             disabled={isLoading}
-            className="flex-grow"
+            className="relative flex-grow pr-[3.75rem]"
           />
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Sending..." : "Send"}
+          <Button
+            size="icon"
+            variant="secondary"
+            type="submit"
+            disabled={isLoading}
+            className="absolute right-[.5rem] top-[1rem]"
+          >
+            {isLoading ? "Sending..." : <CornerRightUp className="w-5 h-5" />}
           </Button>
         </form>
       </div>
