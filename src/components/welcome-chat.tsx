@@ -1,6 +1,8 @@
 import React from "react";
 import {
   Sun,
+  Moon,
+  Coffee,
   MessageSquare,
   Plus,
   ChevronDown,
@@ -12,7 +14,21 @@ import { Button } from "./ui/button";
 import { Card, CardHeader, CardDescription, CardTitle } from "./ui/card";
 import { Textarea } from "./ui/textarea";
 
+// Utility function to get the greeting based on the current time
+const getGreeting = () => {
+  const currentHour = new Date().getHours();
+  if (currentHour < 12) {
+    return { text: "Good morning!", Icon: Coffee };
+  } else if (currentHour < 18) {
+    return { text: "Good afternoon!", Icon: Sun };
+  } else {
+    return { text: "Good evening!", Icon: Moon };
+  }
+};
+
 const WelcomeChat = () => {
+  const { text, Icon } = getGreeting();
+
   return (
     <div className="">
       <div className="max-w-md md:max-w-xl lg:max-w-3xl mx-auto">
@@ -20,8 +36,8 @@ const WelcomeChat = () => {
           <Badge className="py-1 px-6 text-base">Guest Plan</Badge>
 
           <h1 className="text-4xl font-light mb-6 flex items-center">
-            <Sun className="h-8 w-8 inline-block mr-2 relative top-[0rem]" />
-            <span>Good morning!</span>
+            <Icon className="h-8 w-8 inline-block mr-2 relative top-[0rem]" />
+            <span>{text}</span> {/* Use the greeting here */}
           </h1>
         </div>
         <Card className="relative border-none">
@@ -44,39 +60,47 @@ const WelcomeChat = () => {
         <div className="flex items-center justify-between mt-6 mb-2">
           <div className="flex items-center">
             <MessageSquare size={16} className="mr-2" />
-            <span className="font-semibold">Your recent chats</span>
-            <ChevronDown size={16} className="ml-2" />
+            <span className="font-semibold">Prompt Suggestions:</span>
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {[
             {
-              title: "Uploading Code to GitHub from Visual...",
-              time: "6 minutes ago",
+              title: "Customer Persona",
+              description:
+                "Create a detailed customer persona for our target market.",
             },
             {
-              title: "Pushing Local Code to GitHub Repo",
-              time: "7 minutes ago",
-            },
-            { title: "Markdown Task List React App", time: "2 hours ago" },
-            {
-              title: "Explaining how to use a React component",
-              time: "2 hours ago",
+              title: "Feature Prioritization",
+              description:
+                "Analyze and prioritize our product backlog for the next quarter.",
             },
             {
-              title: "Complementary Dark Theme for Custom CSS...",
-              time: "2 hours ago",
+              title: "Pricing Strategy",
+              description:
+                "Suggest optimal pricing tiers based on our features and market.",
             },
             {
-              title: "AI-Powered Social Media Content Creation SaaS",
-              time: "15 hours ago",
+              title: "Churn Reduction",
+              description:
+                "Propose strategies to reduce customer churn rate by 20%.",
+            },
+            {
+              title: "Competitor Analysis",
+              description:
+                "Compare our product features with top 3 competitors.",
+            },
+            {
+              title: "Growth Hacking",
+              description:
+                "Generate 5 creative growth hacking ideas for rapid user acquisition.",
             },
           ].map((chat, index) => (
             <Card key={index} className="">
               <CardHeader>
                 <CardTitle className="text-lg">{chat.title}</CardTitle>
-                <CardDescription>{chat.time}</CardDescription>
+                <CardDescription>{chat.description}</CardDescription>
               </CardHeader>
             </Card>
           ))}
