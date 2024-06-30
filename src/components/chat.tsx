@@ -30,7 +30,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
   };
 
   return (
-    <div className="relative flex flex-col rounded-lg my-2 bg-primary-foreground border">
+    <div className="relative flex flex-col rounded-lg my-2 bg-primary-foreground border max-w-2xl overflow-x-auto">
       <div className="text-text-300 absolute pl-3 pt-2.5 text-xs ">
         {language}
       </div>
