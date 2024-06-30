@@ -3,13 +3,66 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "./ui/textarea";
-import { CornerRightUp } from "lucide-react";
+import { CornerRightUp, CopyIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
+
+interface CodeBlockProps {
+  language: string;
+  value: string;
+}
+
+const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative flex flex-col rounded-lg my-2">
+      <div className="text-text-300 absolute pl-3 pt-2.5 text-xs">
+        {language}
+      </div>
+      <div className="pointer-events-none sticky z-20 my-0.5 ml-0.5 flex items-center justify-end px-1.5 py-1 mix-blend-luminosity top-0">
+        <div className="from-bg-300/90 to-bg-300/70 pointer-events-auto rounded-md bg-gradient-to-b p-0.5 backdrop-blur-md">
+          <button
+            onClick={handleCopy}
+            className="flex flex-row items-center gap-1 rounded-md p-1 py-0.5 text-xs transition-opacity delay-100 hover:bg-bg-200"
+          >
+            <CopyIcon
+              size={14}
+              className="text-text-500 mr-px -translate-y-[0.5px]"
+            />
+            <span className="text-text-200 pr-0.5">
+              {copied ? "Copied!" : "Copy"}
+            </span>
+          </button>
+        </div>
+      </div>
+      <SyntaxHighlighter
+        language={language}
+        style={oneDark}
+        customStyle={{
+          margin: "0",
+          borderRadius: "0.5rem",
+          fontSize: "0.875rem",
+          lineHeight: "1.5",
+        }}
+      >
+        {value}
+      </SyntaxHighlighter>
+    </div>
+  );
+};
 
 export default function Chat() {
   const [inputMessage, setInputMessage] = useState("");
@@ -115,31 +168,41 @@ export default function Chat() {
               {message.role === "user" ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <ReactMarkdown
-                  components={{
-                    p: ({ node, ...props }) => (
-                      <p className="whitespace-pre-wrap" {...props} />
-                    ),
-                    pre: ({ node, ...props }) => (
-                      <pre
-                        className="bg-gray-800 text-white p-2 rounded"
-                        {...props}
-                      />
-                    ),
-                    //@ts-ignore
-                    code: ({ node, inline, ...props }) =>
-                      inline ? (
-                        <code
-                          className="bg-gray-200 text-red-500 px-1 rounded"
-                          {...props}
-                        />
-                      ) : (
-                        <code {...props} />
+                <div className="grid-col-1 grid gap-2.5">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ node, ...props }) => (
+                        <p className="whitespace-pre-wrap" {...props} />
                       ),
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
+
+                      code: ({
+                        node,
+                        //@ts-ignore
+                        inline,
+                        className,
+                        children,
+                        ...props
+                      }) => {
+                        const match = /language-(\w+)/.exec(className || "");
+                        return !inline && match ? (
+                          <CodeBlock
+                            language={match[1]}
+                            value={String(children).replace(/\n$/, "")}
+                          />
+                        ) : (
+                          <code
+                            className="bg-gray-200 text-red-500 px-1 rounded"
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               )}
             </div>
           </div>
