@@ -1,3 +1,5 @@
+import Chat from "@/components/chat";
+
 export default function ChatPage({
   params,
 }: {
@@ -7,5 +9,9 @@ export default function ChatPage({
 }) {
   const chatid = params.id;
 
-  return <main className="">chat page{chatid}</main>;
+  return (
+    <main className="">
+      <Chat />
+    </main>
+  );
 }
