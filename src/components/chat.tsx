@@ -7,6 +7,8 @@ import { CornerRightUp, CopyIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import gfm from "remark-gfm";
+import raw from "rehype-raw";
 
 interface Message {
   role: "user" | "assistant";
@@ -170,6 +172,8 @@ export default function Chat() {
               ) : (
                 <div className="grid-col-1 grid gap-2.5">
                   <ReactMarkdown
+                    remarkPlugins={[gfm as any]}
+                    rehypePlugins={[raw as any]}
                     components={{
                       p: ({ node, ...props }) => (
                         <p className="whitespace-pre-wrap" {...props} />
