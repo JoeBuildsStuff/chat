@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "./ui/textarea";
 import { CornerRightUp, CopyIcon } from "lucide-react";
@@ -11,6 +11,12 @@ import gfm from "remark-gfm";
 import raw from "rehype-raw";
 import PromptSuggestions from "./prompt-suggestions";
 import CopyButton from "./copy-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Message {
   role: "user" | "assistant";
@@ -85,6 +91,14 @@ export default function Chat() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const totalChatCost = useMemo(() => {
+    return messages.reduce((total, message) => {
+      const messageCost =
+        (Number(message.inputCost) || 0) + (Number(message.outputCost) || 0);
+      return total + messageCost;
+    }, 0);
+  }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,10 +203,10 @@ export default function Chat() {
             }`}
           >
             <div
-              className={`inline-block py-4 px-4 rounded-lg ${
+              className={`inline-block rounded-lg ${
                 message.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground relative"
+                  ? "bg-primary text-primary-foreground p-2"
+                  : "py-4 px-4 bg-secondary text-secondary-foreground relative"
               }`}
             >
               {message.role === "user" ? (
@@ -251,12 +265,28 @@ export default function Chat() {
                   >
                     {message.content}
                   </ReactMarkdown>
-                  {message.inputTokens && message.outputTokens && (
-                    <div className="text-xs text-muted-foreground mt-2">
-                      Input cost: ${message.inputCost} | Output cost: $
-                      {message.outputCost}
-                    </div>
-                  )}
+                  <div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="">
+                          <div className="text-xs text-muted-foreground">
+                            Message Cost: $
+                            {(
+                              (Number(message.inputCost) || 0) +
+                              (Number(message.outputCost) || 0)
+                            ).toFixed(4)}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="">
+                            Input cost: $
+                            {Number(message.inputCost || 0).toFixed(5)} | Output
+                            cost: ${Number(message.outputCost || 0).toFixed(5)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <div className="absolute -bottom-4 right-2">
                     <CopyButton text={message.content} />
                   </div>
@@ -268,6 +298,11 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
       <div className="sticky bottom-0 bg-background pt-2">
+        {messages.length > 0 && (
+          <div className="text-right mb-1 text-xs text-muted-foreground">
+            Total Chat Cost: ${totalChatCost.toFixed(4)}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="flex space-x-2">
           <Textarea
             value={inputMessage}
@@ -281,7 +316,7 @@ export default function Chat() {
             variant="secondary"
             type="submit"
             disabled={isLoading}
-            className="absolute right-[.5rem] top-[1rem]"
+            className="absolute right-[.5rem] bottom-[2rem]"
           >
             {isLoading ? "Sending..." : <CornerRightUp className="w-5 h-5" />}
           </Button>
