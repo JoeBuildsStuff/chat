@@ -10,6 +10,7 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import gfm from "remark-gfm";
 import raw from "rehype-raw";
 import PromptSuggestions from "./prompt-suggestions";
+import CopyButton from "./copy-button";
 
 interface Message {
   role: "user" | "assistant";
@@ -166,13 +167,13 @@ export default function Chat() {
               className={`inline-block py-4 px-4 rounded-lg ${
                 message.role === "user"
                   ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground"
+                  : "bg-secondary text-secondary-foreground relative"
               }`}
             >
               {message.role === "user" ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <div className="grid-col-1 grid gap-2.5 whitespace-pre-wrap max-w-lg">
+                <div className=" grid-col-1 grid gap-2.5 whitespace-pre-wrap max-w-lg">
                   <ReactMarkdown
                     remarkPlugins={[gfm as any]}
                     rehypePlugins={[raw as any]}
@@ -226,6 +227,9 @@ export default function Chat() {
                   >
                     {message.content}
                   </ReactMarkdown>
+                  <div className="absolute -bottom-4 right-2">
+                    <CopyButton text={message.content} />
+                  </div>
                 </div>
               )}
             </div>
