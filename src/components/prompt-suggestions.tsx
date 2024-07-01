@@ -1,9 +1,7 @@
 import React from "react";
-import { Coffee, Sun, Moon, MessageSquare, Paperclip } from "lucide-react";
+import { Coffee, Sun, Moon, MessageSquare } from "lucide-react";
 import { Card, CardHeader, CardDescription, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
 
 const getGreeting = () => {
   const currentHour = new Date().getHours();

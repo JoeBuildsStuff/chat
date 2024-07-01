@@ -172,7 +172,7 @@ export default function Chat() {
               {message.role === "user" ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <div className="grid-col-1 grid gap-2.5">
+                <div className="grid-col-1 grid gap-2.5 whitespace-pre-wrap max-w-lg">
                   <ReactMarkdown
                     remarkPlugins={[gfm as any]}
                     rehypePlugins={[raw as any]}
