@@ -18,7 +18,7 @@ export default function MainNav() {
     <header className="flex h-20 w-full shrink-0 items-center px-4 md:px-6">
       <Link href="#" className="flex mr-6 text-primary" prefetch={false}>
         <MessagesSquare className="h-8 w-8" />
-        <span className="ml-4 font-semibold text-lg">Chat-AI</span>
+        <span className="ml-4 font-semibold text-lg">ChatApp-AI</span>
       </Link>
       <NavigationMenu className="hidden md:flex">
         <NavigationMenuList>
