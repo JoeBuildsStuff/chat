@@ -9,6 +9,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import gfm from "remark-gfm";
 import raw from "rehype-raw";
+import PromptSuggestions from "./prompt-suggestions";
 
 interface Message {
   role: "user" | "assistant";
@@ -152,6 +153,7 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] p-4 max-w-3xl mx-auto">
+      {messages.length === 0 && <PromptSuggestions />}
       <div className="flex-grow overflow-y-auto mb-4 pb-4">
         {messages.map((message, index) => (
           <div

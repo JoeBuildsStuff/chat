@@ -1,9 +1,9 @@
-import WelcomeChat from "@/components/welcome-chat";
+import Chat from "@/components/chat";
 
 export default function Home() {
   return (
     <main className="">
-      <WelcomeChat />
+      <Chat />
     </main>
   );
 }
