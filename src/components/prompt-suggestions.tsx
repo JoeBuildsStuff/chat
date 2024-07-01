@@ -68,12 +68,12 @@ const PromptSuggestions: React.FC = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {suggestions.map((chat, index) => (
-          <Card key={index} className="relative">
+          <Card key={index} className="relative group">
             <CardHeader>
               <CardTitle className="text-lg">{chat.title}</CardTitle>
               <CardDescription>{chat.description}</CardDescription>
             </CardHeader>
-            <div className="absolute -bottom-4 right-1">
+            <div className="absolute -bottom-[.5rem] right-[.5rem] opacity-0 group-hover:opacity-100 transition-opacity">
               <CopyButton text={chat.description} />
             </div>
           </Card>

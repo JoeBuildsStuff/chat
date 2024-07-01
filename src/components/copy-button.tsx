@@ -20,8 +20,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ text }) => {
   return (
     <Button
       variant="outline"
-      size="sm"
-      className="rounded-xl"
+      className="p-2 h-7 rounded-md"
       onClick={handleCopy}
     >
       <CopyIcon className="w-3 h-3 mr-2" />
