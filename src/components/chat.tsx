@@ -15,6 +15,10 @@ import CopyButton from "./copy-button";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  inputCost?: number;
+  outputCost?: number;
 }
 
 interface CodeBlockProps {
@@ -88,7 +92,8 @@ export default function Chat() {
 
     setIsLoading(true);
     const userMessage: Message = { role: "user", content: inputMessage };
-    setMessages((prevMessages) => [...prevMessages, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInputMessage("");
 
     try {
@@ -97,7 +102,7 @@ export default function Chat() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({ messages: updatedMessages }),
       });
 
       if (!res.ok) {
@@ -128,13 +133,33 @@ export default function Chat() {
               setIsLoading(false);
               break;
             }
-            const newContent = JSON.parse(data);
-            aiResponse += newContent;
-            setMessages((prevMessages) => {
-              const updatedMessages = [...prevMessages];
-              updatedMessages[updatedMessages.length - 1].content += newContent;
-              return updatedMessages;
-            });
+            try {
+              const parsedData = JSON.parse(data);
+              if (typeof parsedData === "string") {
+                aiResponse += parsedData;
+                setMessages((prevMessages) => {
+                  const updatedMessages = [...prevMessages];
+                  updatedMessages[updatedMessages.length - 1].content +=
+                    parsedData;
+                  return updatedMessages;
+                });
+              } else if (parsedData.inputTokens && parsedData.outputTokens) {
+                setMessages((prevMessages) => {
+                  const updatedMessages = [...prevMessages];
+                  updatedMessages[updatedMessages.length - 1].inputTokens =
+                    parsedData.inputTokens;
+                  updatedMessages[updatedMessages.length - 1].outputTokens =
+                    parsedData.outputTokens;
+                  updatedMessages[updatedMessages.length - 1].inputCost =
+                    parsedData.inputCost;
+                  updatedMessages[updatedMessages.length - 1].outputCost =
+                    parsedData.outputCost;
+                  return updatedMessages;
+                });
+              }
+            } catch (error) {
+              console.error("Error parsing data:", error);
+            }
           }
         }
       }
@@ -173,7 +198,7 @@ export default function Chat() {
               {message.role === "user" ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <div className=" grid-col-1 grid gap-2.5 whitespace-pre-wrap max-w-lg">
+                <div className="grid-col-1 grid gap-2.5 whitespace-pre-wrap max-w-lg">
                   <ReactMarkdown
                     remarkPlugins={[gfm as any]}
                     rehypePlugins={[raw as any]}
@@ -199,7 +224,6 @@ export default function Chat() {
                           {...props}
                         />
                       ),
-
                       code: ({
                         node,
                         //@ts-ignore
@@ -227,6 +251,12 @@ export default function Chat() {
                   >
                     {message.content}
                   </ReactMarkdown>
+                  {message.inputTokens && message.outputTokens && (
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Input cost: ${message.inputCost} | Output cost: $
+                      {message.outputCost}
+                    </div>
+                  )}
                   <div className="absolute -bottom-4 right-2">
                     <CopyButton text={message.content} />
                   </div>
