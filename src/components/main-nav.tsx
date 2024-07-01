@@ -12,6 +12,8 @@ import {
 import MobileNav from "./mobile-nav";
 import AuthButton from "./user-auth-button";
 import { MessagesSquare } from "lucide-react";
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 
 export default function MainNav() {
   return (
@@ -61,7 +63,16 @@ export default function MainNav() {
         </NavigationMenuList>
       </NavigationMenu>
       <div className="ml-auto flex gap-2">
+        <SignedOut>
+          <SignInButton>
+            <Button variant="link">Sign in </Button>
+          </SignInButton>
+        </SignedOut>
+        <SignedIn>
+          <UserButton />
+        </SignedIn>
         <AuthButton />
+
         {/* <MobileNav /> */}
       </div>
     </header>
