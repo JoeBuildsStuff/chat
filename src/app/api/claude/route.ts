@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "edge";
 
@@ -8,6 +10,12 @@ const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
 const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
 
 export async function POST(req: NextRequest) {
+  // Authenticate the user
+  const { userId } = auth();
+  if (!userId) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const body = await req.json();
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -55,6 +63,26 @@ export async function POST(req: NextRequest) {
       // Calculate costs
       const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
       const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
+      const totalCost = inputCost + outputCost;
+
+      // Update user's metadata with accumulated costs
+      try {
+        const user = await clerkClient.users.getUser(userId);
+        const currentCost = (user.publicMetadata.totalCost as number) || 0;
+        const updatedCost = currentCost + totalCost;
+
+        await clerkClient.users.updateUser(userId, {
+          publicMetadata: {
+            ...user.publicMetadata,
+            totalCost: updatedCost,
+          },
+        });
+
+        console.log("User metadata updated with total cost:", updatedCost);
+      } catch (error) {
+        console.error("Error updating user metadata:", error);
+        // You might want to add some error handling here, such as sending an error response
+      }
 
       // Send the token counts and costs at the end of the stream
       controller.enqueue(

@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SignInButton } from "@clerk/nextjs";
 
 interface Message {
   role: "user" | "assistant";
@@ -83,6 +84,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showSignInButton, setShowSignInButton] = useState(false);
 
   useEffect(() => {
     scrollToBottom();
@@ -118,6 +120,19 @@ export default function Chat() {
         },
         body: JSON.stringify({ messages: updatedMessages }),
       });
+
+      if (res.status === 401) {
+        // Add AI-like response for unauthorized access
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            role: "assistant",
+            content: "Hold on! I need you to log in first before I can help.",
+          },
+        ]);
+        setShowSignInButton(true);
+        throw new Error("Unauthorized");
+      }
 
       if (!res.ok) {
         throw new Error("Failed to send message");
@@ -179,13 +194,15 @@ export default function Chat() {
       }
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: "assistant",
-          content: "An error occurred while sending the message.",
-        },
-      ]);
+      if ((error as Error).message !== "Unauthorized") {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            role: "assistant",
+            content: "An error occurred while sending the message.",
+          },
+        ]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -265,6 +282,17 @@ export default function Chat() {
                   >
                     {message.content}
                   </ReactMarkdown>
+                  {message.role === "assistant" &&
+                    showSignInButton &&
+                    index === messages.length - 1 && (
+                      <div className="mt-2">
+                        <SignInButton>
+                          <Button className=" text-white bg-violet-600 hover:bg-violet-500 dark:bg-violet-700 dark:hover:bg-violet-800">
+                            Sign in
+                          </Button>
+                        </SignInButton>
+                      </div>
+                    )}
                   <div>
                     <TooltipProvider>
                       <Tooltip>
@@ -287,7 +315,7 @@ export default function Chat() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <div className="absolute -bottom-4 right-2">
+                  <div className="absolute -bottom-[.80rem] right-2">
                     <CopyButton text={message.content} />
                   </div>
                 </div>
