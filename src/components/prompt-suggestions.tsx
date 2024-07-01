@@ -2,6 +2,7 @@ import React from "react";
 import { Coffee, Sun, Moon, MessageSquare } from "lucide-react";
 import { Card, CardHeader, CardDescription, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
+import CopyButton from "./copy-button";
 
 const getGreeting = () => {
   const currentHour = new Date().getHours();
@@ -61,17 +62,20 @@ const PromptSuggestions: React.FC = () => {
       <div className="flex items-center justify-between mt-6 mb-2">
         <div className="flex items-center">
           <MessageSquare size={16} className="mr-2" />
-          <span className="font-semibold">Prompt Suggestions:</span>
+          <span className="font-semibold">Prompt Suggestions</span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {suggestions.map((chat, index) => (
-          <Card key={index} className="">
+          <Card key={index} className="relative">
             <CardHeader>
               <CardTitle className="text-lg">{chat.title}</CardTitle>
               <CardDescription>{chat.description}</CardDescription>
             </CardHeader>
+            <div className="absolute -bottom-4 right-1">
+              <CopyButton text={chat.description} />
+            </div>
           </Card>
         ))}
       </div>

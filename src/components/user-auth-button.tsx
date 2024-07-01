@@ -150,9 +150,9 @@ AuthButtonProps) {
     </DropdownMenu>
   ) : (
     <div className="flex items-center gap-4">
-      <Button asChild className="font-semibold text-lg">
+      {/* <Button asChild className="font-semibold text-lg">
         <Link href="/signin">Get Started</Link>
-      </Button>
+      </Button> */}
       <ModeToggle />
     </div>
   );
