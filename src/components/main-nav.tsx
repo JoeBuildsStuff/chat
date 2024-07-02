@@ -66,7 +66,7 @@ export default function MainNav() {
       </Button>
       <Button asChild variant="ghost" size="icon" className="h-9 w-9">
         <Link
-          href="https://medium.com/@learningsomethingnew"
+          href="https://medium.com/@learningsomethingnew/1-day-build-ai-chat-interface-ed9aa61425ff"
           prefetch={false}
           target="_blank"
           rel="noopener noreferrer"
