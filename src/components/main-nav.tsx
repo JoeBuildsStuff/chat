@@ -149,7 +149,7 @@ export default async function MainNav() {
           <SignedIn>
             {user?.publicMetadata.totalCost !== undefined && (
               <Badge
-                variant="secondary"
+                variant="outline"
                 className="text-muted-foreground py-1 px-4"
               >
                 {/* @ts-ignore */}
