@@ -16,11 +16,27 @@ export async function POST(req: NextRequest) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const body = await req.json();
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  const formData = await req.formData();
+  const messagesJson = formData.get("messages") as string;
+  const messages = JSON.parse(messagesJson);
+  const files = formData.getAll("files") as File[];
+
+  // Process file contents
+  const fileContents = await Promise.all(
+    files.map(async (file) => {
+      const text = await file.text();
+      return `File: ${file.name}\nContent:\n${text}\n\n`;
+    })
+  );
+
+  // Combine file contents with user message
+  const lastUserMessage = messages[messages.length - 1];
+  lastUserMessage.content += "\n\n" + fileContents.join("");
+
   // Convert the messages to the format expected by Anthropic
-  const anthropicMessages = body.messages.map((msg: any) => ({
+  const anthropicMessages = messages.map((msg: any) => ({
     role: msg.role,
     content: [{ type: "text", text: msg.content }],
   }));
