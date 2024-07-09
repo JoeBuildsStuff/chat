@@ -1,7 +1,7 @@
 import React from "react";
 import { Coffee, Sun, Moon, MessageSquare } from "lucide-react";
-import { Card, CardHeader, CardDescription, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge";
+import { Card, CardHeader, CardDescription, CardTitle } from "../ui/card";
+import { Badge } from "../ui/badge";
 import CopyButton from "./copy-button";
 
 const getGreeting = () => {

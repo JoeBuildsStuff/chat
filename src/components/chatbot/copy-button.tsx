@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { CopyIcon } from "lucide-react";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 
 interface CopyButtonProps {
   text: string;

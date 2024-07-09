@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "./ui/textarea";
+import { Textarea } from "../ui/textarea";
 import { CornerRightUp, CopyIcon } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
