@@ -13,9 +13,22 @@ import MobileNav from "./mobile-nav";
 import AuthButton from "./user-auth-button";
 import { MessagesSquare } from "lucide-react";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import { Button } from "@/components/ui/button";
+import { User } from "@clerk/nextjs/server";
+import { Badge } from "./ui/badge";
 
-export default function MainNav() {
+type UserWithMetadata = User & {
+  publicMetadata: {
+    totalCost?: number;
+  };
+};
+
+export default async function MainNav() {
+  const user = await currentUser();
+
+  console.log(user?.publicMetadata.totalCost);
+
   return (
     <header className="flex h-20 w-full shrink-0 items-center px-4 md:px-6">
       <Link href="/" className="flex mr-6 text-primary" prefetch={false}>
@@ -132,10 +145,20 @@ export default function MainNav() {
             <Button variant="link">Sign in </Button>
           </SignInButton>
         </SignedOut>
-        <SignedIn>
-          <UserButton />
-        </SignedIn>
-
+        <div className="flex flex-row space-x-4">
+          <SignedIn>
+            {user?.publicMetadata.totalCost !== undefined && (
+              <Badge
+                variant="secondary"
+                className="text-muted-foreground py-1 px-4"
+              >
+                {/* @ts-ignore */}
+                Total: ${user.publicMetadata.totalCost?.toFixed(2) ?? "0.00"}
+              </Badge>
+            )}
+            <UserButton />
+          </SignedIn>
+        </div>
         <AuthButton />
 
         {/* <MobileNav /> */}
