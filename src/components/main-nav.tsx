@@ -153,7 +153,7 @@ export default async function MainNav() {
                 className="text-muted-foreground py-1 px-4"
               >
                 {/* @ts-ignore */}
-                Total: ${user.publicMetadata.totalCost?.toFixed(2) ?? "0.00"}
+                Total: ${user.publicMetadata.totalCost?.toFixed(4) ?? "0.00"}
               </Badge>
             )}
             <UserButton />
