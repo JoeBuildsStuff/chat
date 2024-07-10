@@ -9,6 +9,28 @@ export const runtime = "edge";
 const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
 const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
 
+// Add the random number generator tool
+const tools: Anthropic.Messages.Tool[] = [
+  {
+    name: "generate_random_number",
+    description: "Generates a random number within a specified range.",
+    input_schema: {
+      type: "object",
+      properties: {
+        min: {
+          type: "number",
+          description: "The minimum value of the range (inclusive).",
+        },
+        max: {
+          type: "number",
+          description: "The maximum value of the range (inclusive).",
+        },
+      },
+      required: ["min", "max"],
+    },
+  },
+];
+
 export async function POST(req: NextRequest) {
   // Authenticate the user
   const { userId } = auth();
@@ -47,6 +69,7 @@ export async function POST(req: NextRequest) {
     temperature: 0,
     messages: anthropicMessages,
     stream: true,
+    tools: tools,
   });
 
   const encoder = new TextEncoder();
@@ -55,7 +78,12 @@ export async function POST(req: NextRequest) {
 
   const customReadable = new ReadableStream({
     async start(controller) {
+      let currentToolUse = null;
+      let currentToolInput = "";
+
       for await (const chunk of stream) {
+        console.log("Chunk:", chunk);
+
         //extract input tokens
         if (chunk.type === "message_start") {
           totalInputTokens = chunk.message.usage.input_tokens;
@@ -73,6 +101,68 @@ export async function POST(req: NextRequest) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(chunk.delta.text)}\n\n`)
           );
+        }
+
+        if (
+          chunk.type === "content_block_start" &&
+          chunk.content_block.type === "tool_use"
+        ) {
+          // Start of a new tool use
+          currentToolUse = chunk.content_block;
+          currentToolInput = "";
+          console.log("Tool use started:", currentToolUse);
+        } else if (
+          chunk.type === "content_block_delta" &&
+          chunk.delta.type === "input_json_delta"
+        ) {
+          // Accumulate tool input
+          currentToolInput += chunk.delta.partial_json;
+          console.log(
+            "Accumulate tool input Current tool input:",
+            currentToolInput
+          );
+        } else if (chunk.type === "content_block_stop" && currentToolUse) {
+          // End of tool input, parse and execute
+          console.log(
+            "End of tool input, parse and execute Current tool input:",
+            currentToolInput
+          );
+          try {
+            const toolInput = JSON.parse(currentToolInput);
+            console.log("Tool input:", toolInput);
+
+            if (currentToolUse.name === "generate_random_number") {
+              const { min, max } = toolInput;
+              console.log("min:", min);
+              console.log("max:", max);
+              const randomNumber =
+                Math.floor(Math.random() * (max - min + 1)) + min;
+              const toolResult = {
+                tool_use_id: currentToolUse.id,
+                content: randomNumber.toString(),
+              };
+
+              console.log("toolResult:", toolResult);
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "tool_result",
+                    ...toolResult,
+                  })}\n\n`
+                )
+              );
+            }
+
+            console.log(
+              "check input before resetting Current tool input:",
+              currentToolInput
+            );
+            // Reset for next tool use
+            currentToolUse = null;
+            currentToolInput = "";
+          } catch (error) {
+            console.error("Error parsing or executing tool input:", error);
+          }
         }
       }
 
