@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
       let currentToolUse = null;
       let currentToolInput = "";
 
+      let currentResponseText = "";
       for await (const chunk of stream) {
         //extract input tokens
         if (chunk.type === "message_start") {
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
           chunk.type === "content_block_delta" &&
           chunk.delta.type === "text_delta"
         ) {
+          currentResponseText += chunk.delta.text;
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(chunk.delta.text)}\n\n`)
           );
@@ -106,6 +108,7 @@ export async function POST(req: NextRequest) {
           chunk.type === "content_block_start" &&
           chunk.content_block.type === "tool_use"
         ) {
+          console.log("currentResponseText", currentResponseText);
           // Start of a new tool use
           currentToolUse = chunk.content_block;
           currentToolInput = "";
@@ -145,22 +148,22 @@ export async function POST(req: NextRequest) {
 
               // Prepare messages array before sending tool result back to Claude
               const updatedMessages: Anthropic.Messages.MessageParam[] = [
-                {
-                  role: "user",
-                  content: "provide a random number between 1 and 100",
-                },
+                ...messages.map((msg: any) => ({
+                  role: msg.role,
+                  content: msg.content,
+                })),
                 {
                   role: "assistant",
                   content: [
                     {
                       type: "text",
-                      text: "Certainly! I can help you generate a random number between 1 and 100 using the available tool. Let's use the generate_random_number function to do this.",
+                      text: currentResponseText,
                     },
                     {
-                      type: "tool_use",
+                      type: currentToolUse.type,
                       id: currentToolUse.id,
                       name: currentToolUse.name,
-                      input: toolInput, // Ensure this is an object
+                      input: toolInput,
                     },
                   ],
                 },
