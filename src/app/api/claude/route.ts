@@ -108,6 +108,8 @@ export async function POST(req: NextRequest) {
           chunk.type === "content_block_start" &&
           chunk.content_block.type === "tool_use"
         ) {
+          console.log("content_block_start chunk", chunk);
+
           console.log("currentResponseText", currentResponseText);
           // Start of a new tool use
           currentToolUse = chunk.content_block;
@@ -117,6 +119,8 @@ export async function POST(req: NextRequest) {
           chunk.type === "content_block_delta" &&
           chunk.delta.type === "input_json_delta"
         ) {
+          console.log("content_block_delta chunk", chunk);
+
           // Accumulate tool input
           currentToolInput += chunk.delta.partial_json;
           console.log(
@@ -124,6 +128,7 @@ export async function POST(req: NextRequest) {
             currentToolInput
           );
         } else if (chunk.type === "content_block_stop" && currentToolUse) {
+          console.log("content_block_stop chunk", chunk);
           // End of tool input, parse and execute
           console.log(
             "End of tool input, parse and execute Current tool input:",
@@ -209,6 +214,24 @@ export async function POST(req: NextRequest) {
                       `data: ${JSON.stringify(responseChunk.delta.text)}\n\n`
                     )
                   );
+                }
+
+                // Accumulate output tokens from responseChunk
+                if (responseChunk.type === "message_delta") {
+                  console.log(
+                    "responseChunk.usage.output_tokens",
+                    responseChunk.usage.output_tokens
+                  );
+                  totalOutputTokens += responseChunk.usage.output_tokens;
+                }
+
+                // Accumulate input tokens from responseChunk
+                if (responseChunk.type === "message_start") {
+                  console.log(
+                    "responseChunk.message.usage.input_tokens",
+                    responseChunk.message.usage.input_tokens
+                  );
+                  totalInputTokens += responseChunk.message.usage.input_tokens;
                 }
               }
 
