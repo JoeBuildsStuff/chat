@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let waitingForToolResult = false;
 
   const customReadable = new ReadableStream({
     async start(controller) {
@@ -82,8 +83,6 @@ export async function POST(req: NextRequest) {
       let currentToolInput = "";
 
       for await (const chunk of stream) {
-        console.log("Chunk:", chunk);
-
         //extract input tokens
         if (chunk.type === "message_start") {
           totalInputTokens = chunk.message.usage.input_tokens;
@@ -143,14 +142,74 @@ export async function POST(req: NextRequest) {
               };
 
               console.log("toolResult:", toolResult);
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "tool_result",
-                    ...toolResult,
-                  })}\n\n`
-                )
-              );
+
+              // Prepare messages array before sending tool result back to Claude
+              const updatedMessages: Anthropic.Messages.MessageParam[] = [
+                {
+                  role: "user",
+                  content: "provide a random number between 1 and 100",
+                },
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "text",
+                      text: "Certainly! I can help you generate a random number between 1 and 100 using the available tool. Let's use the generate_random_number function to do this.",
+                    },
+                    {
+                      type: "tool_use",
+                      id: currentToolUse.id,
+                      name: currentToolUse.name,
+                      input: toolInput, // Ensure this is an object
+                    },
+                  ],
+                },
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "tool_result",
+                      tool_use_id: currentToolUse.id,
+                      content: toolResult.content,
+                    },
+                  ],
+                },
+              ];
+
+              console.log("updatedMessages:", updatedMessages);
+
+              waitingForToolResult = true;
+              const toolResultResponse = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20240620",
+                max_tokens: 1000,
+                messages: updatedMessages,
+                stream: true,
+                tools: tools,
+              });
+
+              if (!toolResultResponse) {
+                console.error("No response from Claude", toolResultResponse);
+                throw new Error("No response from Claude");
+              }
+
+              console.log("toolResultResponse:", toolResultResponse);
+
+              // Process Claude's response after tool use
+              for await (const responseChunk of toolResultResponse) {
+                console.log("responseChunk:", responseChunk);
+                if (
+                  responseChunk.type === "content_block_delta" &&
+                  responseChunk.delta.type === "text_delta"
+                ) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify(responseChunk.delta.text)}\n\n`
+                    )
+                  );
+                }
+              }
+
+              waitingForToolResult = false;
             }
 
             console.log(
