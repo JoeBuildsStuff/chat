@@ -29,7 +29,49 @@ const tools: Anthropic.Messages.Tool[] = [
       required: ["min", "max"],
     },
   },
+  {
+    name: "summarize_url",
+    description: "Summarizes the content of a given URL using Jina AI Reader.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The URL to summarize.",
+        },
+      },
+      required: ["url"],
+    },
+  },
 ];
+
+// Add this function to handle the summarize_url tool
+async function handleSummarizeUrl(url: string): Promise<string> {
+  console.log("Summarizing URL:", url);
+  try {
+    const response = await fetch(`https://r.jina.ai/${url}`, {
+      headers: {
+        "X-Return-Format": "text",
+        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+      },
+    });
+    console.log("Jina AI Reader response:", response);
+    if (!response.ok) {
+      console.error("HTTP error!", response.status);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const readerResponse = await response.text();
+    console.log(
+      "Jina AI Reader response:",
+      readerResponse.substring(0, 200) + "..."
+    ); // Log first 200 characters
+    return readerResponse;
+  } catch (error) {
+    console.error("Error fetching URL content:", error);
+    return `Error: Unable to fetch URL content. ${error}`;
+  }
+}
 
 export async function POST(req: NextRequest) {
   // Authenticate the user
@@ -132,6 +174,86 @@ export async function POST(req: NextRequest) {
                 content: randomNumber.toString(),
               };
 
+              // Prepare messages array before sending tool result back to Claude
+              const updatedMessages: Anthropic.Messages.MessageParam[] = [
+                ...messages.map((msg: any) => ({
+                  role: msg.role,
+                  content: msg.content,
+                })),
+                {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "text",
+                      text: currentResponseText,
+                    },
+                    {
+                      type: currentToolUse.type,
+                      id: currentToolUse.id,
+                      name: currentToolUse.name,
+                      input: toolInput,
+                    },
+                  ],
+                },
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "tool_result",
+                      tool_use_id: currentToolUse.id,
+                      content: toolResult.content,
+                    },
+                  ],
+                },
+              ];
+
+              waitingForToolResult = true;
+              const toolResultResponse = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20240620",
+                max_tokens: 1000,
+                messages: updatedMessages,
+                stream: true,
+                tools: tools,
+              });
+
+              if (!toolResultResponse) {
+                console.error("No response from Claude", toolResultResponse);
+                throw new Error("No response from Claude");
+              }
+
+              // Process Claude's response after tool use
+              for await (const responseChunk of toolResultResponse) {
+                if (
+                  responseChunk.type === "content_block_delta" &&
+                  responseChunk.delta.type === "text_delta"
+                ) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify(responseChunk.delta.text)}\n\n`
+                    )
+                  );
+                }
+
+                // Accumulate output tokens from responseChunk
+                if (responseChunk.type === "message_delta") {
+                  totalOutputTokens += responseChunk.usage.output_tokens;
+                }
+
+                // Accumulate input tokens from responseChunk
+                if (responseChunk.type === "message_start") {
+                  totalInputTokens += responseChunk.message.usage.input_tokens;
+                }
+              }
+
+              waitingForToolResult = false;
+            } else if (currentToolUse.name === "summarize_url") {
+              const { url } = JSON.parse(currentToolInput);
+              const content = await handleSummarizeUrl(url);
+
+              const toolResult = {
+                tool_use_id: currentToolUse.id,
+                content: content,
+              };
               // Prepare messages array before sending tool result back to Claude
               const updatedMessages: Anthropic.Messages.MessageParam[] = [
                 ...messages.map((msg: any) => ({
