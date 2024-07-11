@@ -9,72 +9,109 @@ export const runtime = "edge";
 const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
 const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
 
-// Add the random number generator tool
-const tools: Anthropic.Messages.Tool[] = [
+// Define tool types
+type Tool = {
+  name: string;
+  description: string;
+  handler: (input: any) => Promise<string>;
+};
+
+// Define tools
+const tools: Tool[] = [
   {
     name: "generate_random_number",
     description: "Generates a random number within a specified range.",
-    input_schema: {
-      type: "object",
-      properties: {
-        min: {
-          type: "number",
-          description: "The minimum value of the range (inclusive).",
-        },
-        max: {
-          type: "number",
-          description: "The maximum value of the range (inclusive).",
-        },
-      },
-      required: ["min", "max"],
+    handler: async ({ min, max }: { min: number; max: number }) => {
+      console.log(`Generating random number between ${min} and ${max}`);
+      const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+      return randomNumber.toString();
     },
   },
   {
     name: "summarize_url",
     description: "Summarizes the content of a given URL using Jina AI Reader.",
-    input_schema: {
-      type: "object",
-      properties: {
-        url: {
-          type: "string",
-          description: "The URL to summarize.",
-        },
-      },
-      required: ["url"],
+    handler: async ({ url }: { url: string }) => {
+      console.log("Summarizing URL:", url);
+      try {
+        const response = await fetch(`https://r.jina.ai/${url}`, {
+          headers: {
+            "X-Return-Format": "text",
+            Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const readerResponse = await response.text();
+        console.log(
+          "Jina AI Reader response:",
+          readerResponse.substring(0, 200) + "..."
+        );
+        return readerResponse;
+      } catch (error) {
+        console.error("Error fetching URL content:", error);
+        return `Error: Unable to fetch URL content. ${error}`;
+      }
     },
   },
 ];
 
-// Add this function to handle the summarize_url tool
-async function handleSummarizeUrl(url: string): Promise<string> {
-  console.log("Summarizing URL:", url);
+// Convert tools to Anthropic format
+const anthropicTools: Anthropic.Messages.Tool[] = tools.map((tool) => ({
+  name: tool.name,
+  description: tool.description,
+  input_schema: {
+    type: "object",
+    properties:
+      tool.name === "generate_random_number"
+        ? {
+            min: {
+              type: "number",
+              description: "The minimum value of the range (inclusive).",
+            },
+            max: {
+              type: "number",
+              description: "The maximum value of the range (inclusive).",
+            },
+          }
+        : {
+            url: { type: "string", description: "The URL to summarize." },
+          },
+    required: tool.name === "generate_random_number" ? ["min", "max"] : ["url"],
+  },
+}));
+
+async function processFiles(files: File[]): Promise<string> {
+  const fileContents = await Promise.all(
+    files.map(async (file) => {
+      const text = await file.text();
+      return `File: ${file.name}\nContent:\n${text}\n\n`;
+    })
+  );
+  return fileContents.join("");
+}
+
+async function updateUserCost(
+  userId: string,
+  totalCost: number
+): Promise<void> {
   try {
-    const response = await fetch(`https://r.jina.ai/${url}`, {
-      headers: {
-        "X-Return-Format": "text",
-        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+    const user = await clerkClient.users.getUser(userId);
+    const currentCost = (user.publicMetadata.totalCost as number) || 0;
+    const updatedCost = currentCost + totalCost;
+
+    await clerkClient.users.updateUser(userId, {
+      publicMetadata: {
+        ...user.publicMetadata,
+        totalCost: updatedCost,
       },
     });
-    console.log("Jina AI Reader response:", response);
-    if (!response.ok) {
-      console.error("HTTP error!", response.status);
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const readerResponse = await response.text();
-    console.log(
-      "Jina AI Reader response:",
-      readerResponse.substring(0, 200) + "..."
-    ); // Log first 200 characters
-    return readerResponse;
   } catch (error) {
-    console.error("Error fetching URL content:", error);
-    return `Error: Unable to fetch URL content. ${error}`;
+    console.error("Error updating user metadata:", error);
   }
 }
 
 export async function POST(req: NextRequest) {
-  // Authenticate the user
   const { userId } = auth();
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
@@ -83,23 +120,13 @@ export async function POST(req: NextRequest) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const formData = await req.formData();
-  const messagesJson = formData.get("messages") as string;
-  const messages = JSON.parse(messagesJson);
+  const messages = JSON.parse(formData.get("messages") as string);
   const files = formData.getAll("files") as File[];
 
-  // Process file contents
-  const fileContents = await Promise.all(
-    files.map(async (file) => {
-      const text = await file.text();
-      return `File: ${file.name}\nContent:\n${text}\n\n`;
-    })
-  );
-
-  // Combine file contents with user message
+  const fileContent = await processFiles(files);
   const lastUserMessage = messages[messages.length - 1];
-  lastUserMessage.content += "\n\n" + fileContents.join("");
+  lastUserMessage.content += "\n\n" + fileContent;
 
-  // Convert the messages to the format expected by Anthropic
   const anthropicMessages = messages.map((msg: any) => ({
     role: msg.role,
     content: [{ type: "text", text: msg.content }],
@@ -111,28 +138,23 @@ export async function POST(req: NextRequest) {
     temperature: 0,
     messages: anthropicMessages,
     stream: true,
-    tools: tools,
+    tools: anthropicTools,
   });
 
   const encoder = new TextEncoder();
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  let waitingForToolResult = false;
 
   const customReadable = new ReadableStream({
     async start(controller) {
-      let currentToolUse = null;
+      let currentToolUse: any = null;
       let currentToolInput = "";
-
       let currentResponseText = "";
+
       for await (const chunk of stream) {
-        //extract input tokens
         if (chunk.type === "message_start") {
           totalInputTokens = chunk.message.usage.input_tokens;
-        }
-
-        //extract output tokens
-        if (chunk.type === "message_delta") {
+        } else if (chunk.type === "message_delta") {
           totalOutputTokens = chunk.usage.output_tokens;
         }
 
@@ -150,43 +172,26 @@ export async function POST(req: NextRequest) {
           chunk.type === "content_block_start" &&
           chunk.content_block.type === "tool_use"
         ) {
-          // Start of a new tool use
           currentToolUse = chunk.content_block;
           currentToolInput = "";
         } else if (
           chunk.type === "content_block_delta" &&
           chunk.delta.type === "input_json_delta"
         ) {
-          // Accumulate tool input
           currentToolInput += chunk.delta.partial_json;
         } else if (chunk.type === "content_block_stop" && currentToolUse) {
-          // End of tool input, parse and execute
           try {
             const toolInput = JSON.parse(currentToolInput);
+            const tool = tools.find((t) => t.name === currentToolUse.name);
 
-            if (currentToolUse.name === "generate_random_number") {
-              const { min, max } = toolInput;
-
-              const randomNumber =
-                Math.floor(Math.random() * (max - min + 1)) + min;
-              const toolResult = {
-                tool_use_id: currentToolUse.id,
-                content: randomNumber.toString(),
-              };
-
-              // Prepare messages array before sending tool result back to Claude
+            if (tool) {
+              const toolResult = await tool.handler(toolInput);
               const updatedMessages: Anthropic.Messages.MessageParam[] = [
-                ...messages.map((msg: any) => ({
-                  role: msg.role,
-                  content: msg.content,
-                })),
+                ...anthropicMessages,
                 {
                   role: "assistant",
                   content: [
-                    {
-                      type: "text",
-                      text: currentResponseText,
-                    },
+                    { type: "text", text: currentResponseText },
                     {
                       type: currentToolUse.type,
                       id: currentToolUse.id,
@@ -201,27 +206,20 @@ export async function POST(req: NextRequest) {
                     {
                       type: "tool_result",
                       tool_use_id: currentToolUse.id,
-                      content: toolResult.content,
+                      content: toolResult,
                     },
                   ],
                 },
               ];
 
-              waitingForToolResult = true;
               const toolResultResponse = await anthropic.messages.create({
                 model: "claude-3-5-sonnet-20240620",
                 max_tokens: 1000,
                 messages: updatedMessages,
                 stream: true,
-                tools: tools,
+                tools: anthropicTools,
               });
 
-              if (!toolResultResponse) {
-                console.error("No response from Claude", toolResultResponse);
-                throw new Error("No response from Claude");
-              }
-
-              // Process Claude's response after tool use
               for await (const responseChunk of toolResultResponse) {
                 if (
                   responseChunk.type === "content_block_delta" &&
@@ -233,102 +231,15 @@ export async function POST(req: NextRequest) {
                     )
                   );
                 }
-
-                // Accumulate output tokens from responseChunk
                 if (responseChunk.type === "message_delta") {
                   totalOutputTokens += responseChunk.usage.output_tokens;
                 }
-
-                // Accumulate input tokens from responseChunk
                 if (responseChunk.type === "message_start") {
                   totalInputTokens += responseChunk.message.usage.input_tokens;
                 }
               }
-
-              waitingForToolResult = false;
-            } else if (currentToolUse.name === "summarize_url") {
-              const { url } = JSON.parse(currentToolInput);
-              const content = await handleSummarizeUrl(url);
-
-              const toolResult = {
-                tool_use_id: currentToolUse.id,
-                content: content,
-              };
-              // Prepare messages array before sending tool result back to Claude
-              const updatedMessages: Anthropic.Messages.MessageParam[] = [
-                ...messages.map((msg: any) => ({
-                  role: msg.role,
-                  content: msg.content,
-                })),
-                {
-                  role: "assistant",
-                  content: [
-                    {
-                      type: "text",
-                      text: currentResponseText,
-                    },
-                    {
-                      type: currentToolUse.type,
-                      id: currentToolUse.id,
-                      name: currentToolUse.name,
-                      input: toolInput,
-                    },
-                  ],
-                },
-                {
-                  role: "user",
-                  content: [
-                    {
-                      type: "tool_result",
-                      tool_use_id: currentToolUse.id,
-                      content: toolResult.content,
-                    },
-                  ],
-                },
-              ];
-
-              waitingForToolResult = true;
-              const toolResultResponse = await anthropic.messages.create({
-                model: "claude-3-5-sonnet-20240620",
-                max_tokens: 1000,
-                messages: updatedMessages,
-                stream: true,
-                tools: tools,
-              });
-
-              if (!toolResultResponse) {
-                console.error("No response from Claude", toolResultResponse);
-                throw new Error("No response from Claude");
-              }
-
-              // Process Claude's response after tool use
-              for await (const responseChunk of toolResultResponse) {
-                if (
-                  responseChunk.type === "content_block_delta" &&
-                  responseChunk.delta.type === "text_delta"
-                ) {
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify(responseChunk.delta.text)}\n\n`
-                    )
-                  );
-                }
-
-                // Accumulate output tokens from responseChunk
-                if (responseChunk.type === "message_delta") {
-                  totalOutputTokens += responseChunk.usage.output_tokens;
-                }
-
-                // Accumulate input tokens from responseChunk
-                if (responseChunk.type === "message_start") {
-                  totalInputTokens += responseChunk.message.usage.input_tokens;
-                }
-              }
-
-              waitingForToolResult = false;
             }
 
-            // Reset for next tool use
             currentToolUse = null;
             currentToolInput = "";
           } catch (error) {
@@ -337,29 +248,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Calculate costs
       const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
       const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
       const totalCost = inputCost + outputCost;
 
-      // Update user's metadata with accumulated costs
-      try {
-        const user = await clerkClient.users.getUser(userId);
-        const currentCost = (user.publicMetadata.totalCost as number) || 0;
-        const updatedCost = currentCost + totalCost;
+      await updateUserCost(userId, totalCost);
 
-        await clerkClient.users.updateUser(userId, {
-          publicMetadata: {
-            ...user.publicMetadata,
-            totalCost: updatedCost,
-          },
-        });
-      } catch (error) {
-        console.error("Error updating user metadata:", error);
-        // You might want to add some error handling here, such as sending an error response
-      }
-
-      // Send the token counts and costs at the end of the stream
       controller.enqueue(
         encoder.encode(
           `data: ${JSON.stringify({
