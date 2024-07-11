@@ -10,9 +10,16 @@ const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
 const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
 
 // Define tool types
+type ToolSchema = {
+  type: "object";
+  properties: Record<string, { type: string; description: string }>;
+  required: string[];
+};
+
 type Tool = {
   name: string;
   description: string;
+  schema: ToolSchema;
   handler: (input: any) => Promise<string>;
 };
 
@@ -21,6 +28,20 @@ const tools: Tool[] = [
   {
     name: "generate_random_number",
     description: "Generates a random number within a specified range.",
+    schema: {
+      type: "object",
+      properties: {
+        min: {
+          type: "number",
+          description: "The minimum value of the range (inclusive).",
+        },
+        max: {
+          type: "number",
+          description: "The maximum value of the range (inclusive).",
+        },
+      },
+      required: ["min", "max"],
+    },
     handler: async ({ min, max }: { min: number; max: number }) => {
       console.log(`Generating random number between ${min} and ${max}`);
       const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
@@ -30,6 +51,13 @@ const tools: Tool[] = [
   {
     name: "summarize_url",
     description: "Summarizes the content of a given URL using Jina AI Reader.",
+    schema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The URL to summarize." },
+      },
+      required: ["url"],
+    },
     handler: async ({ url }: { url: string }) => {
       console.log("Summarizing URL:", url);
       try {
@@ -60,25 +88,7 @@ const tools: Tool[] = [
 const anthropicTools: Anthropic.Messages.Tool[] = tools.map((tool) => ({
   name: tool.name,
   description: tool.description,
-  input_schema: {
-    type: "object",
-    properties:
-      tool.name === "generate_random_number"
-        ? {
-            min: {
-              type: "number",
-              description: "The minimum value of the range (inclusive).",
-            },
-            max: {
-              type: "number",
-              description: "The maximum value of the range (inclusive).",
-            },
-          }
-        : {
-            url: { type: "string", description: "The URL to summarize." },
-          },
-    required: tool.name === "generate_random_number" ? ["min", "max"] : ["url"],
-  },
+  input_schema: tool.schema,
 }));
 
 async function processFiles(files: File[]): Promise<string> {
