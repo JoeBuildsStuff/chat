@@ -108,48 +108,29 @@ export async function POST(req: NextRequest) {
           chunk.type === "content_block_start" &&
           chunk.content_block.type === "tool_use"
         ) {
-          console.log("content_block_start chunk", chunk);
-
-          console.log("currentResponseText", currentResponseText);
           // Start of a new tool use
           currentToolUse = chunk.content_block;
           currentToolInput = "";
-          console.log("Tool use started:", currentToolUse);
         } else if (
           chunk.type === "content_block_delta" &&
           chunk.delta.type === "input_json_delta"
         ) {
-          console.log("content_block_delta chunk", chunk);
-
           // Accumulate tool input
           currentToolInput += chunk.delta.partial_json;
-          console.log(
-            "Accumulate tool input Current tool input:",
-            currentToolInput
-          );
         } else if (chunk.type === "content_block_stop" && currentToolUse) {
-          console.log("content_block_stop chunk", chunk);
           // End of tool input, parse and execute
-          console.log(
-            "End of tool input, parse and execute Current tool input:",
-            currentToolInput
-          );
           try {
             const toolInput = JSON.parse(currentToolInput);
-            console.log("Tool input:", toolInput);
 
             if (currentToolUse.name === "generate_random_number") {
               const { min, max } = toolInput;
-              console.log("min:", min);
-              console.log("max:", max);
+
               const randomNumber =
                 Math.floor(Math.random() * (max - min + 1)) + min;
               const toolResult = {
                 tool_use_id: currentToolUse.id,
                 content: randomNumber.toString(),
               };
-
-              console.log("toolResult:", toolResult);
 
               // Prepare messages array before sending tool result back to Claude
               const updatedMessages: Anthropic.Messages.MessageParam[] = [
@@ -184,8 +165,6 @@ export async function POST(req: NextRequest) {
                 },
               ];
 
-              console.log("updatedMessages:", updatedMessages);
-
               waitingForToolResult = true;
               const toolResultResponse = await anthropic.messages.create({
                 model: "claude-3-5-sonnet-20240620",
@@ -200,11 +179,8 @@ export async function POST(req: NextRequest) {
                 throw new Error("No response from Claude");
               }
 
-              console.log("toolResultResponse:", toolResultResponse);
-
               // Process Claude's response after tool use
               for await (const responseChunk of toolResultResponse) {
-                console.log("responseChunk:", responseChunk);
                 if (
                   responseChunk.type === "content_block_delta" &&
                   responseChunk.delta.type === "text_delta"
@@ -218,19 +194,11 @@ export async function POST(req: NextRequest) {
 
                 // Accumulate output tokens from responseChunk
                 if (responseChunk.type === "message_delta") {
-                  console.log(
-                    "responseChunk.usage.output_tokens",
-                    responseChunk.usage.output_tokens
-                  );
                   totalOutputTokens += responseChunk.usage.output_tokens;
                 }
 
                 // Accumulate input tokens from responseChunk
                 if (responseChunk.type === "message_start") {
-                  console.log(
-                    "responseChunk.message.usage.input_tokens",
-                    responseChunk.message.usage.input_tokens
-                  );
                   totalInputTokens += responseChunk.message.usage.input_tokens;
                 }
               }
@@ -238,10 +206,6 @@ export async function POST(req: NextRequest) {
               waitingForToolResult = false;
             }
 
-            console.log(
-              "check input before resetting Current tool input:",
-              currentToolInput
-            );
             // Reset for next tool use
             currentToolUse = null;
             currentToolInput = "";
@@ -268,8 +232,6 @@ export async function POST(req: NextRequest) {
             totalCost: updatedCost,
           },
         });
-
-        console.log("User metadata updated with total cost:", updatedCost);
       } catch (error) {
         console.error("Error updating user metadata:", error);
         // You might want to add some error handling here, such as sending an error response
