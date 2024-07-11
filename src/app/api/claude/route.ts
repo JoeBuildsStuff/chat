@@ -9,6 +9,12 @@ export const runtime = "edge";
 const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
 const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
 
+// Define the system message for role prompting
+const SYSTEM_MESSAGE = `You are an AI assistant. You are free to answer questions with or without the tools.  You do not need to remind the user
+each time you respond that you do not have a tool for the user's question.  When a tool is a good fit for the user's question, you can use the tool.
+When using a tool, please let the user know what tool you are using and why.  When you are using the summarize_url tool be sure to include in your
+response the URL you are summarizing even if the user provided the url in their message.`;
+
 // Define tool types
 type ToolSchema = {
   type: "object";
@@ -149,6 +155,7 @@ export async function POST(req: NextRequest) {
     messages: anthropicMessages,
     stream: true,
     tools: anthropicTools,
+    system: SYSTEM_MESSAGE,
   });
 
   const encoder = new TextEncoder();
