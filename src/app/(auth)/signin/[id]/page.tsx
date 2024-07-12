@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { MessagesSquare } from "lucide-react";
+import Logo from "@/components/icons/Logo";
 
 export default async function SignIn({
   params,
@@ -68,6 +69,9 @@ export default async function SignIn({
   return (
     <div className="flex flx-col justify-center height-screen-helper">
       <div className="flex flex-col justify-between p-3 m-auto w-[26rem] ">
+        <div className="flex justify-center pb-8 ">
+          <Logo className="text-3xl" />
+        </div>
         <CardSupabase
           title={
             viewProp === "forgot_password"
