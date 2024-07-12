@@ -24,7 +24,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { SignInButton } from "@clerk/nextjs";
 import FileItem from "./file-item";
 
 interface Message {
@@ -310,11 +309,10 @@ export default function Chat() {
                     showSignInButton &&
                     index === messages.length - 1 && (
                       <div className="mt-2">
-                        <SignInButton>
-                          <Button className=" text-white bg-violet-600 hover:bg-violet-500 dark:bg-violet-700 dark:hover:bg-violet-800">
-                            Sign in
-                          </Button>
-                        </SignInButton>
+                        {/* need to add functionality to signin with supabase auth */}
+                        <Button className=" text-white bg-violet-600 hover:bg-violet-500 dark:bg-violet-700 dark:hover:bg-violet-800">
+                          Sign in
+                        </Button>
                       </div>
                     )}
                   <div>

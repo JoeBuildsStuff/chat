@@ -1,7 +1,5 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { clerkClient } from "@clerk/nextjs/server";
-import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "edge";
 
@@ -112,26 +110,14 @@ async function updateUserCost(
   totalCost: number
 ): Promise<void> {
   try {
-    const user = await clerkClient.users.getUser(userId);
-    const currentCost = (user.publicMetadata.totalCost as number) || 0;
-    const updatedCost = currentCost + totalCost;
-
-    await clerkClient.users.updateUser(userId, {
-      publicMetadata: {
-        ...user.publicMetadata,
-        totalCost: updatedCost,
-      },
-    });
+    //set up cost in supabase db
   } catch (error) {
     console.error("Error updating user metadata:", error);
   }
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = auth();
-  if (!userId) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  //check auth from supabase db
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -269,7 +255,7 @@ export async function POST(req: NextRequest) {
       const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
       const totalCost = inputCost + outputCost;
 
-      await updateUserCost(userId, totalCost);
+      //call function to update cost in supabase db
 
       controller.enqueue(
         encoder.encode(
