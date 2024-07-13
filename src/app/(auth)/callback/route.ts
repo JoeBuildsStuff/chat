@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
   } else {
     return NextResponse.redirect(
       getStatusRedirect(
-        `${requestUrl.origin}/getting-started`,
+        `${requestUrl.origin}`,
         'Success!',
         'You are now signed in.'
       )
