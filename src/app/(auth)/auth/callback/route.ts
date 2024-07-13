@@ -9,9 +9,6 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
 
-  console.log("inside auth callback request url:", requestUrl);
-  console.log("inside auth callback code:", code);
-
   if (code) {
     const supabase = createClient();
 
