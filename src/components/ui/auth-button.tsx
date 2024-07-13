@@ -34,7 +34,10 @@ export default async function AuthButton({
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  console.log("inside auth button user:", error);
 
   const signOut = async () => {
     "use server";
