@@ -25,6 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import FileItem from "./file-item";
+import Link from "next/link";
 
 interface Message {
   role: "user" | "assistant";
@@ -310,8 +311,11 @@ export default function Chat() {
                     index === messages.length - 1 && (
                       <div className="mt-2">
                         {/* need to add functionality to signin with supabase auth */}
-                        <Button className=" text-white bg-violet-600 hover:bg-violet-500 dark:bg-violet-700 dark:hover:bg-violet-800">
-                          Sign in
+                        <Button
+                          asChild
+                          className=" text-white bg-violet-600 hover:bg-violet-500 dark:bg-violet-700 dark:hover:bg-violet-800"
+                        >
+                          <Link href="/signin">Sign in</Link>
                         </Button>
                       </div>
                     )}
