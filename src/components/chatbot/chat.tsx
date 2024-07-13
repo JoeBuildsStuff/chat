@@ -244,10 +244,10 @@ export default function Chat() {
             }`}
           >
             <div
-              className={`inline-block rounded-lg ${
+              className={`group inline-block rounded-lg ${
                 message.role === "user"
                   ? "bg-primary text-primary-foreground p-2"
-                  : "py-4 px-4 bg-secondary text-secondary-foreground relative"
+                  : "py-4 px-4 border border-border text-secondary-foreground relative"
               }`}
             >
               {message.role === "user" ? (
@@ -341,7 +341,7 @@ export default function Chat() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <div className="absolute -bottom-[.80rem] right-2">
+                  <div className="hidden group-hover:block absolute -bottom-[.80rem] right-2">
                     <CopyButton text={message.content} />
                   </div>
                 </div>
