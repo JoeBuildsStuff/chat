@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import AuthButton from "./ui/auth-button";
 
 export default async function MainNav() {
   return (
@@ -82,49 +83,10 @@ export default async function MainNav() {
           </svg>
         </Link>
       </Button>
-
-      <NavigationMenu className="hidden md:flex">
-        <NavigationMenuList>
-          {/* <NavigationMenuLink asChild>
-            <Link
-              href="#"
-              className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-              prefetch={false}
-            >
-              Home
-            </Link>
-          </NavigationMenuLink>
-          <NavigationMenuLink asChild>
-            <Link
-              href="#"
-              className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-              prefetch={false}
-            >
-              Features
-            </Link>
-          </NavigationMenuLink>
-          <NavigationMenuLink asChild>
-            <Link
-              href="#"
-              className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-              prefetch={false}
-            >
-              Pricing
-            </Link>
-          </NavigationMenuLink>
-          <NavigationMenuLink asChild>
-            <Link
-              href="#"
-              className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50"
-              prefetch={false}
-            >
-              Contact
-            </Link>
-          </NavigationMenuLink> */}
-        </NavigationMenuList>
-      </NavigationMenu>
       <div className="ml-auto flex gap-2">
-        <div className="flex flex-row space-x-4"></div>
+        <div className="flex flex-row space-x-4">
+          <AuthButton />
+        </div>
       </div>
     </header>
   );
