@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
   if (userProfile.bio) {
     return NextResponse.redirect(
-      `${requestUrl.origin}/workspace/rate-jobs/all-jobs`
+      `${requestUrl.origin}`
     );
   } else {
     return NextResponse.redirect(
