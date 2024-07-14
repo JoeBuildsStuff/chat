@@ -11,17 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  ChevronDown,
-  CircleUser,
-  DollarSign,
-  LogOut,
-  Settings,
-  User,
-} from "lucide-react";
+import { ChevronDown, LogOut, User } from "lucide-react";
 import { ModeToggle } from "../mode-toggle";
-
-// import { ModeToggle2 } from './mode-toggle2';
 
 type AuthButtonProps = {
   size?: "default" | "small" | "tiny";
