@@ -69,8 +69,11 @@ export default async function SignIn({
   return (
     <div className="flex flx-col justify-center height-screen-helper">
       <div className="flex flex-col justify-between p-3 m-auto w-[26rem] ">
-        <div className="flex justify-center pb-8 ">
-          <Logo className="text-3xl" />
+        <div className="flex justify-center py-8 ">
+          <div className="flex flex-row items-center gap-4">
+            <MessagesSquare className="h-8 w-8" />
+            <Logo className="text-3xl font-medium" />
+          </div>
         </div>
         <CardSupabase
           title={
