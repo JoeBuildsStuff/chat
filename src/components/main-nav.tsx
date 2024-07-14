@@ -85,7 +85,7 @@ export default async function MainNav() {
       </Button>
       <div className="ml-auto flex gap-2">
         <div className="flex flex-row space-x-4">
-          <AuthButton />
+          <AuthButton size="small" />
         </div>
       </div>
     </header>
