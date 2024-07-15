@@ -408,7 +408,20 @@ export default function Chat() {
               disabled={isLoading}
               className="absolute right-[.5rem] bottom-[2rem]"
             >
-              {isLoading ? "Sending..." : <CornerRightUp className="w-5 h-5" />}
+              {isLoading ? (
+                <span
+                  className="loader"
+                  style={
+                    {
+                      "--loader-size": "18px",
+                      "--loader-color": "#000",
+                      "--loader-color-dark": "#fff",
+                    } as React.CSSProperties
+                  }
+                ></span>
+              ) : (
+                <CornerRightUp className="w-5 h-5" />
+              )}
             </Button>
           </div>
         </form>
