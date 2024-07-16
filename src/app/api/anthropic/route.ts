@@ -54,12 +54,27 @@ const tools: Tool[] = [
     },
   },
   {
-    name: "summarize_url",
-    description: "Summarizes the content of a given URL using Jina AI Reader.",
+    name: "get_current_datetime",
+    description: "Gets the current date and time.",
+    schema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+    handler: async () => {
+      const now = new Date();
+      const currentDateTime = now.toISOString();
+      console.log("Current date and time:", currentDateTime);
+      return currentDateTime;
+    },
+  },
+  {
+    name: "get_website_content",
+    description: "Retrieves the content of a given URL using Jina AI Reader which will return the markdown content of the website.",
     schema: {
       type: "object",
       properties: {
-        url: { type: "string", description: "The URL to summarize." },
+        url: { type: "string", description: "The URL to retrieve the content from." },
       },
       required: ["url"],
     },
@@ -84,6 +99,40 @@ const tools: Tool[] = [
       } catch (error) {
         console.error("Error fetching URL content:", error);
         return `Error: Unable to fetch URL content. ${error}`;
+      }
+    },
+  },
+  {
+    name: "jina_search",
+    description: "Performs a web search using Jina AI Reader API and returns the top results.  When using the jina_search tool, please include the query in your response. Also include the URL of the search results.",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "The search query to perform." },
+      },
+      required: ["query"],
+    },
+    handler: async ({ query }: { query: string }) => {
+      console.log("Performing Jina search for:", query);
+      try {
+        const response = await fetch(`https://s.jina.ai/${encodeURIComponent(query)}`, {
+          headers: {
+            "X-Return-Format": "text",
+            Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const searchResults = await response.text();
+        console.log(
+          "Jina search results:",
+          searchResults.substring(0, 200) + "..."
+        );
+        return searchResults;
+      } catch (error) {
+        console.error("Error performing Jina search:", error);
+        return `Error: Unable to perform Jina search. ${error}`;
       }
     },
   },
@@ -203,11 +252,13 @@ async function processChunks(
       );
     } else if (chunk.type === "content_block_stop" && currentToolUse) {
       try {
-        const toolInput = JSON.parse(currentToolInput);
+        // Parse the tool input, defaulting to an empty object if it's empty
+        const toolInput = currentToolInput ? JSON.parse(currentToolInput) : {};
         const tool = tools.find((t) => t.name === currentToolUse.name);
-
+  
         if (tool) {
           const toolResult = await tool.handler(toolInput);
+  
           const updatedMessages: Anthropic.Messages.MessageParam[] = [
             ...anthropicMessages,
             {
@@ -269,6 +320,9 @@ async function processChunks(
         currentToolInput = "";
       } catch (error) {
         console.error("Error parsing or executing tool input:", error);
+        // Add more detailed error logging
+        console.error("Current tool use:", currentToolUse);
+        console.error("Current tool input:", currentToolInput);
       }
     }
   }
