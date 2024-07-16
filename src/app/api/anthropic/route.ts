@@ -316,10 +316,10 @@ export async function POST(req: NextRequest) {
   const lastUserMessage = messages[messages.length - 1];
   lastUserMessage.content += "\n\n" + fileContent;
 
-  const anthropicMessages = messages.map((msg: any) => ({
-    role: msg.role,
-    content: [{ type: "text", text: msg.content }],
-  }));
+  // Prepare messages for Anthropic API
+  const anthropicMessages = prepareAnthropicMessages(messages);
+
+  console.log("anthropicMessages", JSON.stringify(anthropicMessages, null, 2));
 
   const stream = await anthropic.messages.create({
     model: "claude-3-5-sonnet-20240620",
@@ -354,4 +354,37 @@ export async function POST(req: NextRequest) {
       Connection: "keep-alive",
     },
   });
+}
+
+function prepareAnthropicMessages(messages: any[]): Anthropic.Messages.MessageParam[] {
+  const anthropicMessages: Anthropic.Messages.MessageParam[] = [];
+  
+  for (const message of messages) {
+    if (message.role === "user") {
+      anthropicMessages.push({
+        role: "user",
+        content: [{ type: "text", text: message.content }],
+      });
+    } else if (message.role === "assistant") {
+      // Combine all assistant messages into a single message
+      const lastAssistantMessage = anthropicMessages[anthropicMessages.length - 1];
+      if (lastAssistantMessage && lastAssistantMessage.role === "assistant") {
+        if (Array.isArray(lastAssistantMessage.content)) {
+          lastAssistantMessage.content.push({ type: "text", text: message.content });
+        } else {
+          lastAssistantMessage.content = [
+            { type: "text", text: lastAssistantMessage.content },
+            { type: "text", text: message.content },
+          ];
+        }
+      } else {
+        anthropicMessages.push({
+          role: "assistant",
+          content: [{ type: "text", text: message.content }],
+        });
+      }
+    }
+  }
+
+  return anthropicMessages;
 }
