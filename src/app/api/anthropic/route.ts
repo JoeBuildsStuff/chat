@@ -132,6 +132,10 @@ async function updateUserCost(
       .update({ api_cost_chat: updatedCost })
       .eq('id', userId)
 
+console.log("currentCost", currentCost);
+console.log("totalCost", totalCost);
+console.log("updatedCost", updatedCost);
+
     if (updateError) throw updateError
   } catch (error) {
     console.error("Error updating user API cost:", error)
