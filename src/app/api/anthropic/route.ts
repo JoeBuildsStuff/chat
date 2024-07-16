@@ -146,10 +146,10 @@ async function processChunks(
   encoder: TextEncoder,
   controller: ReadableStreamDefaultController,
   supabase: ReturnType<typeof createClient>,
-  userId: string
+  userId: string,
+  totalInputTokens: number = 0,
+  totalOutputTokens: number = 0
 ) {
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
   let currentToolUse: any = null;
   let currentToolInput = "";
   let currentResponseText = "";
@@ -157,9 +157,9 @@ async function processChunks(
   for await (const chunk of stream) {
     console.log("chunk", chunk);
     if (chunk.type === "message_start") {
-      totalInputTokens = chunk.message.usage.input_tokens;
+      totalInputTokens += chunk.message.usage.input_tokens;
     } else if (chunk.type === "message_delta") {
-      totalOutputTokens = chunk.usage.output_tokens;
+      totalOutputTokens += chunk.usage.output_tokens;
     }
 
     if (
@@ -178,11 +178,29 @@ async function processChunks(
     ) {
       currentToolUse = chunk.content_block;
       currentToolInput = "";
+      // Notify client of tool call
+      controller.enqueue(
+        encoder.encode(
+          `data: ${JSON.stringify({
+            type: "tool_call",
+            tool: currentToolUse.name,
+          })}\n\n`
+        )
+      );
     } else if (
       chunk.type === "content_block_delta" &&
       chunk.delta.type === "input_json_delta"
     ) {
       currentToolInput += chunk.delta.partial_json;
+      // Stream the input JSON to the client
+      controller.enqueue(
+        encoder.encode(
+          `data: ${JSON.stringify({
+            type: "tool_payload",
+            payload: chunk.delta.partial_json,
+          })}\n\n`
+        )
+      );
     } else if (chunk.type === "content_block_stop" && currentToolUse) {
       try {
         const toolInput = JSON.parse(currentToolInput);
@@ -231,9 +249,21 @@ async function processChunks(
             encoder,
             controller,
             supabase,
-            userId
+            userId,
+            totalInputTokens,
+            totalOutputTokens
           );
         }
+
+        // Notify client that the tool has finished
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "tool_finished",
+              tool: currentToolUse.name,
+            })}\n\n`
+          )
+        );
 
         currentToolUse = null;
         currentToolInput = "";
