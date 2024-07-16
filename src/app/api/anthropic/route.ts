@@ -107,13 +107,35 @@ async function processFiles(files: File[]): Promise<string> {
 }
 
 async function updateUserCost(
+  supabase: ReturnType<typeof createClient>, // Add this parameter
   userId: string,
   totalCost: number
 ): Promise<void> {
   try {
-    //set up cost in supabase db
+    // Get user current incurred total cost
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('api_cost_chat')
+      .eq('id', userId)
+      .single()
+
+    if (error) throw error
+
+    const currentCost = data?.api_cost_chat || 0
+
+    // Add total cost to current cost
+    const updatedCost = currentCost + totalCost
+
+    // Update user cost in the database
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ api_cost_chat: updatedCost })
+      .eq('id', userId)
+
+    if (updateError) throw updateError
   } catch (error) {
-    console.error("Error updating user metadata:", error);
+    console.error("Error updating user API cost:", error)
+    throw error  // Re-throw the error for the caller to handle if needed
   }
 }
 
@@ -260,12 +282,12 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-
       const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
       const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
       const totalCost = inputCost + outputCost;
 
-      //call function to update cost in supabase db
+      await updateUserCost(supabase, user.id, totalCost); 
+
 
       controller.enqueue(
         encoder.encode(
