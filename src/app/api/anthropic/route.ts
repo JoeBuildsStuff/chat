@@ -203,7 +203,8 @@ async function processChunks(
   let currentToolInput = "";
   let currentResponseText = "";
 
-  for await (const chunk of stream) {
+  try {
+    for await (const chunk of stream) {
     console.log("chunk", chunk);
     if (chunk.type === "message_start") {
       totalInputTokens += chunk.message.usage.input_tokens;
@@ -231,7 +232,6 @@ async function processChunks(
       currentToolUse = chunk.content_block;
       currentToolInput = "";
       console.log(`Tool use started: ${currentToolUse.name}`);
-      // Notify client of tool call
       controller.enqueue(
         encoder.encode(
           `data: ${JSON.stringify({
@@ -246,7 +246,6 @@ async function processChunks(
     ) {
       currentToolInput += chunk.delta.partial_json;
       console.log(`Input JSON delta: ${chunk.delta.partial_json}`);
-      // Stream the input JSON to the client
       controller.enqueue(
         encoder.encode(
           `data: ${JSON.stringify({
@@ -258,57 +257,65 @@ async function processChunks(
     } else if (chunk.type === "content_block_stop" && currentToolUse) {
       try {
         console.log(`Tool use stopped: ${currentToolUse.name}`);
-        // Parse the tool input, defaulting to an empty object if it's empty
         const toolInput = currentToolInput ? JSON.parse(currentToolInput) : {};
         const tool = tools.find((t) => t.name === currentToolUse.name);
-  
+
         if (tool) {
           console.log(`Executing tool handler: ${tool.name}`);
           const toolResult = await tool.handler(toolInput, userId);
           console.log(`Tool result: ${toolResult}`);
-  
-          const updatedMessages: Anthropic.Messages.MessageParam[] = [
-            ...anthropicMessages,
-            {
-              role: "assistant",
-              content: [
-                { type: "text", text: currentResponseText },
-                {
-                  type: currentToolUse.type,
-                  id: currentToolUse.id,
-                  name: currentToolUse.name,
-                  input: toolInput,
-                },
-              ],
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "tool_result",
-                  tool_use_id: currentToolUse.id,
-                  content: toolResult,
-                },
-              ],
-            },
-          ];
 
-console.log(`Updated messages: ${JSON.stringify(updatedMessages)}`);
+          // Stream tool result to client
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "tool_result",
+                tool: currentToolUse.name,
+                result: toolResult,
+              })}\n\n`
+            )
+          );
 
+          anthropicMessages.push({
+            role: "assistant",
+            content: [
+              { type: "text", text: currentResponseText },
+              {
+                type: currentToolUse.type,
+                id: currentToolUse.id,
+                name: currentToolUse.name,
+                input: toolInput,
+              },
+            ],
+          });
+
+          anthropicMessages.push({
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: currentToolUse.id,
+                content: toolResult,
+              },
+            ],
+          });
+
+          console.log(`Updated messages: ${JSON.stringify(anthropicMessages)}`);
+
+          // Create a new message to process the tool result
           const toolResultResponse = await anthropic.messages.create({
             model: "claude-3-5-sonnet-20240620",
             max_tokens: 1000,
-            messages: updatedMessages,
+            messages: anthropicMessages,
             stream: true,
             tools: anthropicTools,
           });
 
-console.log(`Tool result response: ${JSON.stringify(toolResultResponse)}`);
-
+          // Process the new message stream
           await processChunks(
             toolResultResponse,
             anthropic,
-            updatedMessages,
+            anthropicMessages,
             encoder,
             controller,
             supabase,
@@ -318,7 +325,6 @@ console.log(`Tool result response: ${JSON.stringify(toolResultResponse)}`);
           );
         }
 
-        // Notify client that the tool has finished
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
@@ -327,18 +333,25 @@ console.log(`Tool result response: ${JSON.stringify(toolResultResponse)}`);
             })}\n\n`
           )
         );
-
-        currentToolUse = null;
-        currentToolInput = "";
       } catch (error) {
-        console.error("Error parsing or executing tool input:", error);
-        // Add more detailed error logging
-        console.error("Current tool use:", currentToolUse);
-        console.error("Current tool input:", currentToolInput);
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "tool_error",
+              tool: currentToolUse.name,
+              error: error instanceof Error ? error.message : String(error),
+            })}\n\n`
+          )
+        );
       }
+
+      currentToolUse = null;
+      currentToolInput = "";
+      currentResponseText = "";
     }
   }
 
+  // Move the cost calculation and final messages outside the loop
   const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
   const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
   const totalCost = inputCost + outputCost;
@@ -361,7 +374,18 @@ console.log(`Tool result response: ${JSON.stringify(toolResultResponse)}`);
   );
 
   controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+} catch (error) {
+  console.error("Error in processChunks:", error);
+  controller.enqueue(
+    encoder.encode(
+      `data: ${JSON.stringify({
+        error: "An error occurred while processing the response",
+      })}\n\n`
+    )
+  );
+} finally {
   controller.close();
+}
 }
 
 export async function POST(req: NextRequest) {
