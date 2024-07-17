@@ -25,7 +25,7 @@ type Tool = {
   name: string;
   description: string;
   schema: ToolSchema;
-  handler: (input: any) => Promise<string>;
+  handler: (input: any, userId: string) => Promise<string>;
 };
 
 // Define tools
@@ -207,8 +207,10 @@ async function processChunks(
     console.log("chunk", chunk);
     if (chunk.type === "message_start") {
       totalInputTokens += chunk.message.usage.input_tokens;
+      console.log(`Message start: input tokens = ${totalInputTokens}`);
     } else if (chunk.type === "message_delta") {
       totalOutputTokens += chunk.usage.output_tokens;
+      console.log(`Message delta: output tokens = ${totalOutputTokens}`);
     }
 
     if (
@@ -216,6 +218,7 @@ async function processChunks(
       chunk.delta.type === "text_delta"
     ) {
       currentResponseText += chunk.delta.text;
+      console.log(`Text delta: ${chunk.delta.text}`);
       controller.enqueue(
         encoder.encode(`data: ${JSON.stringify(chunk.delta.text)}\n\n`)
       );
@@ -227,6 +230,7 @@ async function processChunks(
     ) {
       currentToolUse = chunk.content_block;
       currentToolInput = "";
+      console.log(`Tool use started: ${currentToolUse.name}`);
       // Notify client of tool call
       controller.enqueue(
         encoder.encode(
@@ -241,6 +245,7 @@ async function processChunks(
       chunk.delta.type === "input_json_delta"
     ) {
       currentToolInput += chunk.delta.partial_json;
+      console.log(`Input JSON delta: ${chunk.delta.partial_json}`);
       // Stream the input JSON to the client
       controller.enqueue(
         encoder.encode(
@@ -252,12 +257,15 @@ async function processChunks(
       );
     } else if (chunk.type === "content_block_stop" && currentToolUse) {
       try {
+        console.log(`Tool use stopped: ${currentToolUse.name}`);
         // Parse the tool input, defaulting to an empty object if it's empty
         const toolInput = currentToolInput ? JSON.parse(currentToolInput) : {};
         const tool = tools.find((t) => t.name === currentToolUse.name);
   
         if (tool) {
-          const toolResult = await tool.handler(toolInput);
+          console.log(`Executing tool handler: ${tool.name}`);
+          const toolResult = await tool.handler(toolInput, userId);
+          console.log(`Tool result: ${toolResult}`);
   
           const updatedMessages: Anthropic.Messages.MessageParam[] = [
             ...anthropicMessages,
@@ -285,6 +293,8 @@ async function processChunks(
             },
           ];
 
+console.log(`Updated messages: ${JSON.stringify(updatedMessages)}`);
+
           const toolResultResponse = await anthropic.messages.create({
             model: "claude-3-5-sonnet-20240620",
             max_tokens: 1000,
@@ -292,6 +302,8 @@ async function processChunks(
             stream: true,
             tools: anthropicTools,
           });
+
+console.log(`Tool result response: ${JSON.stringify(toolResultResponse)}`);
 
           await processChunks(
             toolResultResponse,
@@ -330,6 +342,10 @@ async function processChunks(
   const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
   const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
   const totalCost = inputCost + outputCost;
+
+  console.log(`Total input tokens: ${totalInputTokens}`);
+  console.log(`Total output tokens: ${totalOutputTokens}`);
+  console.log(`Total cost: ${totalCost}`);
 
   await updateUserCost(supabase, userId, totalCost);
 
