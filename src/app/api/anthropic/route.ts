@@ -197,195 +197,226 @@ async function processChunks(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   totalInputTokens: number = 0,
-  totalOutputTokens: number = 0
+  totalOutputTokens: number = 0,
+  isTopLevelCall: boolean = true  // New parameter
 ) {
+  let isClosed = false;
   let currentToolUse: any = null;
   let currentToolInput = "";
   let currentResponseText = "";
 
   try {
     for await (const chunk of stream) {
-    console.log("chunk", chunk);
-    if (chunk.type === "message_start") {
-      totalInputTokens += chunk.message.usage.input_tokens;
-      console.log(`Message start: input tokens = ${totalInputTokens}`);
-    } else if (chunk.type === "message_delta") {
-      totalOutputTokens += chunk.usage.output_tokens;
-      console.log(`Message delta: output tokens = ${totalOutputTokens}`);
-    }
+      console.log("chunk", chunk);
+      if (chunk.type === "message_start") {
+        totalInputTokens += chunk.message.usage.input_tokens;
+        console.log(`Message start: input tokens = ${totalInputTokens}`);
+      } else if (chunk.type === "message_delta") {
+        totalOutputTokens += chunk.usage.output_tokens;
+        console.log(`Message delta: output tokens = ${totalOutputTokens}`);
+      }
 
-    if (
-      chunk.type === "content_block_delta" &&
-      chunk.delta.type === "text_delta"
-    ) {
-      currentResponseText += chunk.delta.text;
-      console.log(`Text delta: ${chunk.delta.text}`);
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify(chunk.delta.text)}\n\n`)
-      );
-    }
+      if (
+        chunk.type === "content_block_delta" &&
+        chunk.delta.type === "text_delta"
+      ) {
+        currentResponseText += chunk.delta.text;
+        console.log(`Text delta: ${chunk.delta.text}`);
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(chunk.delta.text)}\n\n`)
+        );
+      }
 
-    if (
-      chunk.type === "content_block_start" &&
-      chunk.content_block.type === "tool_use"
-    ) {
-      currentToolUse = chunk.content_block;
-      currentToolInput = "";
-      console.log(`Tool use started: ${currentToolUse.name}`);
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            type: "tool_call",
-            tool: currentToolUse.name,
-          })}\n\n`
-        )
-      );
-    } else if (
-      chunk.type === "content_block_delta" &&
-      chunk.delta.type === "input_json_delta"
-    ) {
-      currentToolInput += chunk.delta.partial_json;
-      console.log(`Input JSON delta: ${chunk.delta.partial_json}`);
-      controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({
-            type: "tool_payload",
-            payload: chunk.delta.partial_json,
-          })}\n\n`
-        )
-      );
-    } else if (chunk.type === "content_block_stop" && currentToolUse) {
-      try {
-        console.log(`Tool use stopped: ${currentToolUse.name}`);
-        const toolInput = currentToolInput ? JSON.parse(currentToolInput) : {};
-        const tool = tools.find((t) => t.name === currentToolUse.name);
-
-        if (tool) {
-          console.log(`Executing tool handler: ${tool.name}`);
-          const toolResult = await tool.handler(toolInput, userId);
-          console.log(`Tool result: ${toolResult}`);
-
-          // Stream tool result to client
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "tool_result",
-                tool: currentToolUse.name,
-                result: toolResult,
-              })}\n\n`
-            )
-          );
-
-          anthropicMessages.push({
-            role: "assistant",
-            content: [
-              { type: "text", text: currentResponseText },
-              {
-                type: currentToolUse.type,
-                id: currentToolUse.id,
-                name: currentToolUse.name,
-                input: toolInput,
-              },
-            ],
-          });
-
-          anthropicMessages.push({
-            role: "user",
-            content: [
-              {
-                type: "tool_result",
-                tool_use_id: currentToolUse.id,
-                content: toolResult,
-              },
-            ],
-          });
-
-          console.log(`Updated messages: ${JSON.stringify(anthropicMessages)}`);
-
-          // Create a new message to process the tool result
-          const toolResultResponse = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20240620",
-            max_tokens: 1000,
-            messages: anthropicMessages,
-            stream: true,
-            tools: anthropicTools,
-          });
-
-          // Process the new message stream
-          await processChunks(
-            toolResultResponse,
-            anthropic,
-            anthropicMessages,
-            encoder,
-            controller,
-            supabase,
-            userId,
-            totalInputTokens,
-            totalOutputTokens
-          );
-        }
-
+      if (
+        chunk.type === "content_block_start" &&
+        chunk.content_block.type === "tool_use"
+      ) {
+        currentToolUse = chunk.content_block;
+        currentToolInput = "";
+        console.log(`Tool use started: ${currentToolUse.name}`);
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
-              type: "tool_finished",
+              type: "tool_call",
               tool: currentToolUse.name,
+            })}\n\n`
+          )
+        );
+      } else if (
+        chunk.type === "content_block_delta" &&
+        chunk.delta.type === "input_json_delta"
+      ) {
+        currentToolInput += chunk.delta.partial_json;
+        console.log(`Input JSON delta: ${chunk.delta.partial_json}`);
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "tool_payload",
+              payload: chunk.delta.partial_json,
+            })}\n\n`
+          )
+        );
+      } else if (chunk.type === "content_block_stop" && currentToolUse) {
+        try {
+          console.log(`Tool use stopped: ${currentToolUse.name}`);
+          const toolInput = currentToolInput ? JSON.parse(currentToolInput) : {};
+          const tool = tools.find((t) => t.name === currentToolUse.name);
+
+          if (tool) {
+            console.log(`Executing tool handler: ${tool.name}`);
+            const toolResult = await tool.handler(toolInput, userId);
+            console.log(`Tool result: ${toolResult}`);
+
+            // Stream tool result to client
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "tool_result",
+                  tool: currentToolUse.name,
+                  result: toolResult,
+                })}\n\n`
+              )
+            );
+
+            anthropicMessages.push({
+              role: "assistant",
+              content: [
+                { type: "text", text: currentResponseText },
+                {
+                  type: currentToolUse.type,
+                  id: currentToolUse.id,
+                  name: currentToolUse.name,
+                  input: toolInput,
+                },
+              ],
+            });
+
+            anthropicMessages.push({
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: currentToolUse.id,
+                  content: toolResult,
+                },
+              ],
+            });
+
+            console.log(`Updated messages: ${JSON.stringify(anthropicMessages)}`);
+
+            // Create a new message to process the tool result
+            const toolResultResponse = await anthropic.messages.create({
+              model: "claude-3-5-sonnet-20240620",
+              max_tokens: 1000,
+              messages: anthropicMessages,
+              stream: true,
+              tools: anthropicTools,
+            });
+
+            // Process the new message stream
+            await processChunks(
+              toolResultResponse,
+              anthropic,
+              anthropicMessages,
+              encoder,
+              controller,
+              supabase,
+              userId,
+              totalInputTokens,
+              totalOutputTokens,
+              false  // This is not the top-level call
+            );
+          }
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "tool_finished",
+                tool: currentToolUse.name,
+              })}\n\n`
+            )
+          );
+        } catch (error) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "tool_error",
+                tool: currentToolUse.name,
+                error: error instanceof Error ? error.message : String(error),
+              })}\n\n`
+            )
+          );
+        }
+
+        currentToolUse = null;
+        currentToolInput = "";
+        currentResponseText = "";
+      }
+    }
+
+    console.log("Stream processing completed!");
+
+    // Calculate and log totals
+    const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
+    const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
+    const totalCost = inputCost + outputCost;
+
+    console.log(`Total input tokens: ${totalInputTokens}`);
+    console.log(`Total output tokens: ${totalOutputTokens}`);
+    console.log(`Total cost: ${totalCost}`);
+
+    if (!isClosed) {
+      try {
+        await updateUserCost(supabase, userId, totalCost);
+        console.log("Attempting to enqueue final cost data");
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              totalInputTokens,
+              totalOutputTokens,
+              totalCost,
             })}\n\n`
           )
         );
       } catch (error) {
+        console.error("Error enqueuing final cost data:", error);
+      }
+
+      // Only send DONE message and close controller if this is the top-level call
+      if (isTopLevelCall) {
+        try {
+          console.log("Attempting to enqueue DONE message");
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        } catch (error) {
+          console.error("Error enqueuing DONE message:", error);
+        }
+
+        try {
+          console.log("Attempting to close controller");
+          controller.close();
+          isClosed = true;
+        } catch (closeError) {
+          console.error("Error closing controller:", closeError);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in processChunks:", error);
+    if (!isClosed) {
+      try {
+        console.log("Attempting to enqueue error message");
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
-              type: "tool_error",
-              tool: currentToolUse.name,
-              error: error instanceof Error ? error.message : String(error),
+              error: "An error occurred while processing the response",
             })}\n\n`
           )
         );
+      } catch (enqueueError) {
+        console.error("Error enqueuing error message:", enqueueError);
       }
-
-      currentToolUse = null;
-      currentToolInput = "";
-      currentResponseText = "";
     }
   }
-
-  // Move the cost calculation and final messages outside the loop
-  const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
-  const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
-  const totalCost = inputCost + outputCost;
-
-  console.log(`Total input tokens: ${totalInputTokens}`);
-  console.log(`Total output tokens: ${totalOutputTokens}`);
-  console.log(`Total cost: ${totalCost}`);
-
-  await updateUserCost(supabase, userId, totalCost);
-
-  controller.enqueue(
-    encoder.encode(
-      `data: ${JSON.stringify({
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        inputCost: inputCost.toFixed(6),
-        outputCost: outputCost.toFixed(6),
-      })}\n\n`
-    )
-  );
-
-  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-} catch (error) {
-  console.error("Error in processChunks:", error);
-  controller.enqueue(
-    encoder.encode(
-      `data: ${JSON.stringify({
-        error: "An error occurred while processing the response",
-      })}\n\n`
-    )
-  );
-} finally {
-  controller.close();
-}
 }
 
 export async function POST(req: NextRequest) {
@@ -427,15 +458,25 @@ export async function POST(req: NextRequest) {
 
   const customReadable = new ReadableStream({
     async start(controller) {
-      await processChunks(
-        stream,
-        anthropic,
-        anthropicMessages,
-        encoder,
-        controller,
-        supabase,
-        user.id
-      );
+      try {
+        await processChunks(
+          stream,
+          anthropic,
+          anthropicMessages,
+          encoder,
+          controller,
+          supabase,
+          user.id,
+          0,  // totalInputTokens
+          0,  // totalOutputTokens
+          true  // This is the top-level call
+        );
+      } catch (error) {
+        console.error("Error in stream processing:", error);
+        if (!controller.desiredSize) {
+          controller.error(error);
+        }
+      }
     },
   });
 
