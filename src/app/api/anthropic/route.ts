@@ -17,7 +17,15 @@ response the URL you are summarizing even if the user provided the url in their 
 // Define tool types
 type ToolSchema = {
   type: "object";
-  properties: Record<string, { type: string; description: string }>;
+  properties: Record<string, { 
+    type: string; 
+    items?: {  //used if passing an array of objects
+      type: string; 
+      properties?: Record<string, unknown>;
+      required?: string[]; 
+    }; 
+    description: string 
+  }>;
   required: string[];
 };
 
