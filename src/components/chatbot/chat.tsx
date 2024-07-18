@@ -34,6 +34,7 @@ interface Message {
   outputTokens?: number;
   inputCost?: number;
   outputCost?: number;
+  totalCost?: number; // Add this line
 }
 
 interface CodeBlockProps {
@@ -105,11 +106,10 @@ export default function Chat() {
   };
 
   const totalChatCost = useMemo(() => {
-    return messages.reduce((total, message) => {
-      const messageCost =
-        (Number(message.inputCost) || 0) + (Number(message.outputCost) || 0);
-      return total + messageCost;
-    }, 0);
+    return messages.reduce(
+      (total, message) => total + (message.totalCost || 0),
+      0
+    );
   }, [messages]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -128,8 +128,6 @@ export default function Chat() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim() && attachedFiles.length === 0) return;
-
-    console.log("handleSubmit");
 
     setIsLoading(true);
     const userMessage: Message = { role: "user", content: inputMessage };
@@ -169,9 +167,25 @@ export default function Chat() {
       }
 
       let aiResponse = "";
+      let accumulatedCost = {
+        inputTokens: 0,
+        outputTokens: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: 0,
+      };
+
       setMessages((prevMessages) => [
         ...prevMessages,
-        { role: "assistant", content: "" },
+        {
+          role: "assistant",
+          content: "",
+          inputTokens: 0,
+          outputTokens: 0,
+          inputCost: 0,
+          outputCost: 0,
+          totalCost: 0,
+        },
       ]);
 
       while (true) {
@@ -179,7 +193,6 @@ export default function Chat() {
         if (done) break;
 
         const chunk = new TextDecoder().decode(value);
-        console.log("chunk", chunk);
 
         const lines = chunk.split("\n\n");
         for (const line of lines) {
@@ -192,6 +205,7 @@ export default function Chat() {
             }
             try {
               const parsedData = JSON.parse(data);
+              console.log("parsedData", parsedData);
               if (typeof parsedData === "string") {
                 aiResponse += parsedData;
                 setToolCallInProgress(false);
@@ -201,17 +215,23 @@ export default function Chat() {
               } else if (parsedData.type === "tool_payload") {
                 aiResponse += `${parsedData.payload}`;
                 // Keep toolCallInProgress true here
-              } else if (parsedData.inputTokens && parsedData.outputTokens) {
+              } else if (parsedData.totalCost !== undefined) {
+                // Accumulate costs
+                accumulatedCost.inputTokens += parsedData.totalInputTokens;
+                accumulatedCost.outputTokens += parsedData.totalOutputTokens;
+                accumulatedCost.inputCost += parsedData.inputCost;
+                accumulatedCost.outputCost += parsedData.outputCost;
+                accumulatedCost.totalCost += parsedData.totalCost;
+
                 setMessages((prevMessages) => {
                   const updatedMessages = [...prevMessages];
-                  updatedMessages[updatedMessages.length - 1].inputTokens =
-                    parsedData.inputTokens;
-                  updatedMessages[updatedMessages.length - 1].outputTokens =
-                    parsedData.outputTokens;
-                  updatedMessages[updatedMessages.length - 1].inputCost =
-                    parsedData.inputCost;
-                  updatedMessages[updatedMessages.length - 1].outputCost =
-                    parsedData.outputCost;
+                  const lastMessage =
+                    updatedMessages[updatedMessages.length - 1];
+                  lastMessage.inputTokens = accumulatedCost.inputTokens;
+                  lastMessage.outputTokens = accumulatedCost.outputTokens;
+                  lastMessage.inputCost = accumulatedCost.inputCost;
+                  lastMessage.outputCost = accumulatedCost.outputCost;
+                  lastMessage.totalCost = accumulatedCost.totalCost;
                   return updatedMessages;
                 });
                 setToolCallInProgress(false);
@@ -354,17 +374,15 @@ export default function Chat() {
                         <TooltipTrigger className="">
                           <div className="text-xs text-muted-foreground">
                             Message Cost: $
-                            {(
-                              (Number(message.inputCost) || 0) +
-                              (Number(message.outputCost) || 0)
-                            ).toFixed(4)}
+                            {message.totalCost?.toFixed(4) || "0.0000"}
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="">
                             Input cost: $
-                            {Number(message.inputCost || 0).toFixed(5)} | Output
-                            cost: ${Number(message.outputCost || 0).toFixed(5)}
+                            {message.inputCost?.toFixed(5) || "0.00000"} |
+                            Output cost: $
+                            {message.outputCost?.toFixed(5) || "0.00000"}
                           </div>
                         </TooltipContent>
                       </Tooltip>

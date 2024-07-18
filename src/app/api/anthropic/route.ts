@@ -382,6 +382,8 @@ async function processChunks(
             `data: ${JSON.stringify({
               totalInputTokens,
               totalOutputTokens,
+              inputCost,
+              outputCost,
               totalCost,
             })}\n\n`
           )
