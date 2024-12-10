@@ -23,14 +23,14 @@ export default function ChatBotButton() {
           size="icon"
           className="fixed bottom-4 right-4 h-14 w-14 rounded-full shadow-lg"
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-6 w-6 flex-none" />
         </Button>
       </SheetTrigger>
       <SheetContent className="w-[400px] sm:w-[540px] sm:max-w-none">
         <SheetHeader>
           <SheetTitle>Chat</SheetTitle>
         </SheetHeader>
-        <div className="mt-4 h-[calc(100vh-5rem)]">
+        <div className="flex">
           <Chat />
         </div>
       </SheetContent>

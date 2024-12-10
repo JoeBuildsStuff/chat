@@ -11,10 +11,12 @@ import AuthButton from "./ui/auth-button";
 
 export default async function MainNav() {
   return (
-    <header className="flex h-20 w-full shrink-0 items-center px-4 md:px-6">
+    <header className="flex h-10 w-full shrink-0 items-center px-4 md:px-6">
       <Link href="/" className="flex mr-6 text-primary" prefetch={false}>
-        <MessagesSquare className="h-8 w-8" />
-        <span className="ml-4 font-semibold text-lg">ChatApp-AI</span>
+        <MessagesSquare className="h-6 w-6 sm:h-8 sm:w-8 flex-none" />
+        <span className="hidden sm:block ml-4 font-semibold text-lg">
+          ChatApp-AI
+        </span>
       </Link>
       <Button asChild variant="ghost" size="icon" className="h-9 w-9">
         <Link

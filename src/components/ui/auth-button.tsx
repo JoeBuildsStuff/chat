@@ -55,7 +55,7 @@ export default async function AuthButton({
                   alt={user.user_metadata.name}
                 />
                 <AvatarFallback>
-                  <User className="" />
+                  <User className="h-[18px] w-[18px] flex-none" />
                 </AvatarFallback>
               </Avatar>
               <p className="">{user.user_metadata.full_name}</p>
