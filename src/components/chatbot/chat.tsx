@@ -16,7 +16,6 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import gfm from "remark-gfm";
 import raw from "rehype-raw";
-import PromptSuggestions from "./prompt-suggestions";
 import CopyButton from "./copy-button";
 import {
   Tooltip,
@@ -280,7 +279,7 @@ export default function Chat() {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] w-full">
+    <div className="flex flex-col h-[calc(100vh-5rem)] max-w-3xl mx-auto">
       {/* {messages.length === 0 && <PromptSuggestions />} */}
       <div className="flex-1 overflow-y-auto mb-4 pb-4">
         {messages.map((message, index) => (
@@ -407,7 +406,7 @@ export default function Chat() {
         <form onSubmit={handleSubmit} className="flex flex-col space-y-2">
           <div
             {...getRootProps()}
-            className={`relative border-2 border-dashed p-4 rounded-md text-center ${
+            className={`hidden relative border-2 border-dashed p-4 rounded-md text-center ${
               attachedFiles.length === 0 ? "min-h-[2rem]" : "min-h-[12rem]"
             } ${
               isDragActive

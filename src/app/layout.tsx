@@ -1,8 +1,22 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "@/styles/globals.css";
+import "@/app/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AppSidebar } from "@/components/app-sidebar"
+import { DynamicBreadcrumbs } from "@/components/dynamic-breadcrumbs"
+import { ModeToggle } from "@/components/mode-toggle"
+import { Separator } from "@/components/ui/separator"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import { Toaster } from "@/components/ui/toaster"
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
 import MainNav from "@/components/main-nav";
+
+
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,11 +42,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getUser()
+
   return (
     <html lang="en">
       <body className={inter.className}>
@@ -42,7 +59,23 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <SidebarProvider>
+            <AppSidebar userData={data?.user || undefined} />
+            <SidebarInset>
+              <header className="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear">
+                <div className="flex items-center gap-2 px-4 flex-grow ">
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator orientation="vertical" className="mr-2 h-4" />
+                  <DynamicBreadcrumbs />
+                </div>
+                <MainNav />
+              </header>
+              <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                {children}
+              </div>
+              <Toaster />
+            </SidebarInset>
+          </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>

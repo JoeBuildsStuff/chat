@@ -1,23 +1,10 @@
-/**
- * v0 by Vercel.
- * @see https://v0.dev/t/cAB5NoTfXpz
- * Documentation: https://v0.dev/docs#integrating-generated-code-into-your-nextjs-app
- */
-
 import Link from "next/link";
-import { MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import AuthButton from "./ui/auth-button";
+import { ModeToggle } from "./mode-toggle";
 
 export default async function MainNav() {
   return (
-    <header className="flex h-10 w-full shrink-0 items-center px-4 md:px-6">
-      <Link href="/" className="flex mr-6 text-primary" prefetch={false}>
-        <MessagesSquare className="h-6 w-6 sm:h-8 sm:w-8 flex-none" />
-        <span className="hidden sm:block ml-4 font-semibold text-lg">
-          ChatApp-AI
-        </span>
-      </Link>
+    <header className="shrink-0 items-center flex flex-row gap-2">
       <Button asChild variant="ghost" size="icon" className="h-9 w-9">
         <Link
           href="https://github.com/joeBlockchain/chat"
@@ -81,11 +68,7 @@ export default async function MainNav() {
           </svg>
         </Link>
       </Button>
-      <div className="ml-auto flex gap-2">
-        <div className="flex flex-row space-x-4">
-          <AuthButton size="small" />
-        </div>
-      </div>
+      <ModeToggle className="border-none" />
     </header>
   );
 }
