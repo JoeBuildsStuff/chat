@@ -113,28 +113,28 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <Sparkles className="w-5 h-5 mr-4" />
+                <Sparkles className="h-[1.2rem] w-[1.2rem] mr-4" />
                 Upgrade to Pro
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <BadgeCheck className="w-5 h-5 mr-4" />
+                <BadgeCheck className="h-[1.2rem] w-[1.2rem] mr-4" />
                 Account
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCard className="w-5 h-5 mr-4" />
+                <CreditCard className="h-[1.2rem] w-[1.2rem] mr-4" />
                 Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <Bell className="w-5 h-5 mr-4" />
+                <Bell className="h-[1.2rem] w-[1.2rem] mr-4" />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
-              <LogOut className="w-5 h-5 mr-4" />
+              <LogOut className="h-[1.2rem] w-[1.2rem] mr-4" />
           <span>{isLoggingOut ? 'Logging out...' : 'Log out'}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

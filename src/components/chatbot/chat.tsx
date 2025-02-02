@@ -279,7 +279,7 @@ export default function Chat() {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] max-w-3xl mx-auto">
+    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto">
       <div className="flex-1 overflow-y-auto mb-4 pb-4">
         {messages.map((message, index) => (
           <div
@@ -465,7 +465,7 @@ export default function Chat() {
                   }
                 ></span>
               ) : (
-                <CornerRightUp className="w-5 h-5" />
+                <CornerRightUp className="h-[1.2rem] w-[1.2rem]" />
               )}
             </Button>
           </div>

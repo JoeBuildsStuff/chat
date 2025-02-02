@@ -3,9 +3,6 @@ import { Inter } from "next/font/google";
 import "@/app/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppSidebar } from "@/components/app-sidebar"
-import { DynamicBreadcrumbs } from "@/components/dynamic-breadcrumbs"
-import { ModeToggle } from "@/components/mode-toggle"
-import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
   SidebarProvider,
@@ -65,8 +62,6 @@ export default async function RootLayout({
               <header className="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear">
                 <div className="flex items-center gap-2 px-4 flex-grow ">
                   <SidebarTrigger className="-ml-1" />
-                  <Separator orientation="vertical" className="mr-2 h-4" />
-                  <DynamicBreadcrumbs />
                 </div>
                 <MainNav />
               </header>

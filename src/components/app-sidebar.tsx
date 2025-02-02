@@ -2,13 +2,13 @@
 
 import * as React from "react"
 import {
-  Search,
   SquarePen,
   MessageSquare,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { SearchChat } from "@/components/search-chat"
 import {
   Sidebar,
   SidebarContent,
@@ -64,8 +64,8 @@ export function AppSidebar({ userData, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mx-2 flex flex-row gap-4 justify-end items-center mt-[.1rem] group-has-[[data-collapsible=icon]]/sidebar-wrapper:flex-col">
-       <Search className="w-5 h-5" />
-       <SquarePen className="w-5 h-5" />
+        <SearchChat />
+        <SquarePen className="h-[1.2rem] w-[1.2rem]" />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

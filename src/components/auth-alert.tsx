@@ -33,20 +33,17 @@ export function AuthAlert({ isOpen }: AuthAlertProps) {
 
   return (
     <AlertDialog open={showDialog}>
-      <AlertDialogContent className="max-w-sm">
+      <AlertDialogContent className="max-w-sm gap-10">
         <AlertDialogHeader className="">
-          <AlertDialogTitle className="text-center">Welcome back</AlertDialogTitle>
-          <AlertDialogDescription className="text-center">
-            Log in or sign up to get smarter responses, upload files and images, and more.
+          <AlertDialogTitle className="text-center text-3xl">Welcome!</AlertDialogTitle>
+          <AlertDialogDescription className="text-center text-lg">
+            Log in to get smarter responses, upload files and images, and more.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="items-center justify-center mx-auto">
           <div className="flex flex-col gap-4 ">
             <AlertDialogAction asChild className="">
-              <Link href="/login">Log in</Link>
-            </AlertDialogAction>
-            <AlertDialogAction asChild className="">
-              <Link href="/signup">Sign up</Link>
+              <Link href="/signin">Log in</Link>
             </AlertDialogAction>
             <AlertDialogCancel asChild className="border-none underline" onClick={handleStayLoggedOut}>
               <button>Stay logged out</button>

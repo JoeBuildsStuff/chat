@@ -37,7 +37,7 @@ export default async function AuthButton({
   };
 
   const avatarSizeClass =
-    size === "tiny" ? "w-5 h-5" : size === "small" ? "w-7 h-7" : "w-10 h-10";
+    size === "tiny" ? "h-[1.2rem] w-[1.2rem]" : size === "small" ? "w-7 h-7" : "w-10 h-10";
 
   return user ? (
     <div className="flex items-center gap-4">
@@ -62,7 +62,7 @@ export default async function AuthButton({
             </div>
             <ChevronDown
               strokeWidth={1}
-              className="w-5 h-5 text-muted-foreground"
+              className="h-[1.2rem] w-[1.2rem] text-muted-foreground"
             />
           </Button>
         </DropdownMenuTrigger>
