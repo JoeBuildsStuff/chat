@@ -280,7 +280,6 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] max-w-3xl mx-auto">
-      {/* {messages.length === 0 && <PromptSuggestions />} */}
       <div className="flex-1 overflow-y-auto mb-4 pb-4">
         {messages.map((message, index) => (
           <div

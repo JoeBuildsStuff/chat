@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   Search,
   SquarePen,
+  MessageSquare,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -29,6 +30,7 @@ const data = {
     {
       title: "Today",
       url: "#",
+      icon: MessageSquare,
       isActive: true,
       items: [
         {
