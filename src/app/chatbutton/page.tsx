@@ -1,10 +1,10 @@
 import ChatBotButton from "@/components/chatbot/chat-bot-button";
-import MainNav from "@/components/main-nav";
+import SocialLinks from "@/components/social-links";
 
 export default function ChatButton() {
   return (
     <main className="">
-      <MainNav />
+      <SocialLinks />
       <ChatBotButton />
     </main>
   );

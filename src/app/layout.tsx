@@ -11,10 +11,9 @@ import {
 import { Toaster } from "@/components/ui/toaster"
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import MainNav from "@/components/main-nav";
-
-
-
+import SocialLinks from "@/components/social-links";
+import ModelSelector from "@/components/model-selector";
+import NewChatButton from "@/components/new-chat-button";
 const inter = Inter({ subsets: ["latin"] });
 
 const title = "Chat App by Me";
@@ -46,6 +45,8 @@ export default async function RootLayout({
 }>) {
   const supabase = await createClient()
   const { data } = await supabase.auth.getUser()
+  
+  const isLoggedIn = !!data?.user
 
   return (
     <html lang="en">
@@ -56,21 +57,37 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SidebarProvider>
-            <AppSidebar userData={data?.user || undefined} />
-            <SidebarInset>
-              <header className="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear">
-                <div className="flex items-center gap-2 px-4 flex-grow ">
-                  <SidebarTrigger className="-ml-1" />
+          {isLoggedIn ? (
+            <SidebarProvider>
+              <AppSidebar userData={data.user} />
+              <SidebarInset>
+                <header className="flex shrink-0 items-center gap-2 transition-[width,height] ease-linear">
+                  <div className="flex items-center gap-2 px-4 flex-grow ">
+                    <SidebarTrigger className="-ml-1" />
+                    <NewChatButton />
+                    <ModelSelector />
+                  </div>
+                  <SocialLinks />
+                </header>
+                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                  {children}
                 </div>
-                <MainNav />
-              </header>
-              <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-                {children}
+                <Toaster />
+              </SidebarInset>
+            </SidebarProvider>
+          ) : (
+            <div className="flex flex-1 flex-col">
+              <div className="flex flex-row justify-between items-center">
+              <div className="flex flex-row items-center gap-2 flex-grow ">
+                <NewChatButton />
+                <ModelSelector />
+                </div>
+                <SocialLinks />
               </div>
+              {children}
               <Toaster />
-            </SidebarInset>
-          </SidebarProvider>
+            </div>
+          )}
         </ThemeProvider>
       </body>
     </html>

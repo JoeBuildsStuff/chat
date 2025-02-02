@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 
 import { User } from '@supabase/supabase-js'
+import NewChatButton from "@/components/new-chat-button"
 
 // Add interface for the user data
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -65,7 +66,7 @@ export function AppSidebar({ userData, ...props }: AppSidebarProps) {
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mx-2 flex flex-row gap-4 justify-end items-center mt-[.1rem] group-has-[[data-collapsible=icon]]/sidebar-wrapper:flex-col">
         <SearchChat />
-        <SquarePen className="h-[1.2rem] w-[1.2rem]" />
+        <NewChatButton />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

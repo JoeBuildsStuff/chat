@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "./mode-toggle";
 
-export default async function MainNav() {
+export default async function SocialLinks() {
   return (
     <header className="shrink-0 items-center flex flex-row gap-2">
       <Button asChild variant="ghost" size="icon" className="h-9 w-9">
