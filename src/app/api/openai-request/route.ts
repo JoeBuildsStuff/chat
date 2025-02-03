@@ -5,10 +5,6 @@ import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 
 export const runtime = "edge";
 
-// Define cost constants
-const INPUT_TOKEN_COST = .15; // Cost per 1,000,000 input tokens
-const OUTPUT_TOKEN_COST = .6; // Cost per 1,000,000 output tokens
-
 // Define the system message for role prompting
 const SYSTEM_MESSAGE = `You are an AI assistant. You are free to answer questions with or without the tools.  You do not need to remind the user
 each time you respond that you do not have a tool for the user's question.  When a tool is a good fit for the user's question, you can use the tool.
@@ -216,7 +212,9 @@ async function processChunks(
   userId: string,
   totalInputTokens: number = 0,
   totalOutputTokens: number = 0,
-  isTopLevelCall: boolean = true
+  isTopLevelCall: boolean = true,
+  inputCost: number,
+  outputCost: number
 ) {
   let isClosed = false;
   let currentToolUse: string | null = null;
@@ -349,7 +347,9 @@ async function processChunks(
                 userId,
                 totalInputTokens,
                 totalOutputTokens,
-                false
+                false,
+                inputCost,
+                outputCost
               );
 
               controller.enqueue(
@@ -387,9 +387,9 @@ async function processChunks(
     // Example usage/metering for final cost
     // (OpenAI's streaming chunks do not return usage. 
     // You may do a separate usage check or capture usage from the final response.)
-    const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
-    const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
-    const totalCost = inputCost + outputCost;
+    const inputTotalCost = (totalInputTokens / 1_000_000) * inputCost;
+    const outputTotalCost = (totalOutputTokens / 1_000_000) * outputCost;
+    const totalCost = inputTotalCost + outputTotalCost;
 
     console.log(`Total input tokens: ${totalInputTokens}`);
     console.log(`Total output tokens: ${totalOutputTokens}`);
@@ -407,8 +407,8 @@ async function processChunks(
             `data: ${JSON.stringify({
               totalInputTokens,
               totalOutputTokens,
-              inputCost,
-              outputCost,
+              inputCost: inputTotalCost,
+              outputCost: outputTotalCost,
               totalCost,
             })}\n\n`
           )
@@ -470,26 +470,46 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const messages = JSON.parse(formData.get("messages") as string);
+  const selectedModel = formData.get("model") as string;
+  const reasoningModel = formData.get("reasoningModel") as string;
+
+  console.log("selectedModel", selectedModel);
+  const inputCost = parseFloat(formData.get("inputCost") as string);
+  const outputCost = parseFloat(formData.get("outputCost") as string);
   const files = formData.getAll("files") as File[];
 
   const fileContent = await processFiles(files);
   const lastUserMessage = messages[messages.length - 1];
   lastUserMessage.content += "\n\n" + fileContent;
 
-  // Prepare messages for Anthropic API
+  // Prepare messages for OpenAI API
   const openaiMessages = prepareOpenAIMessages(messages);
 
-  const stream = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_tokens: 3000,
-    temperature: 0,
-    messages: [
-      { role: "system", content: SYSTEM_MESSAGE },
-      ...openaiMessages
-    ],
+  // Determine if using a reasoning model
+  const isReasoningModel = reasoningModel === "true";
+
+  // Choose the appropriate initial message
+  const initialMessage = isReasoningModel
+    ? { role: "developer", content: "Formatting re-enabled\n" + SYSTEM_MESSAGE }
+    : { role: "system", content: SYSTEM_MESSAGE };
+
+  // Construct the parameters for the OpenAI API call
+  const completionRequest: any = {
+    model: selectedModel,
+    messages: [initialMessage, ...openaiMessages],
     stream: true,
     tools: OpenAITools,
-  });
+  };
+
+  if (isReasoningModel) {
+    completionRequest.reasoning_effort = "high";
+    completionRequest.max_completion_tokens = 3000;
+  } else {
+    completionRequest.temperature = 0;
+    completionRequest.max_tokens = 3000;
+  }
+
+  const stream = await openai.chat.completions.create(completionRequest);
 
   const encoder = new TextEncoder();
 
@@ -497,16 +517,18 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         await processChunks(
-          stream,
+          stream as unknown as AsyncIterable<any>,
           openai,
           openaiMessages,
           encoder,
           controller,
           supabase,
           user?.id || "",
-          0,  // totalInputTokens
-          0,  // totalOutputTokens
-          true  // This is the top-level call
+          0,
+          0,
+          true,
+          inputCost,
+          outputCost
         );
       } catch (error) {
         console.error("Error in stream processing:", error);
@@ -525,6 +547,7 @@ export async function POST(req: NextRequest) {
     },
   });
 }
+
 function prepareOpenAIMessages(messages: any[]): OpenAI.Chat.ChatCompletionMessageParam[] {
   const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   

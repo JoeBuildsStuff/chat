@@ -4,10 +4,6 @@ import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "edge";
 
-// Define cost constants
-const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
-const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
-
 // Define the system message for role prompting
 const SYSTEM_MESSAGE = `You are an AI assistant. You are free to answer questions with or without the tools.  You do not need to remind the user
 each time you respond that you do not have a tool for the user's question.  When a tool is a good fit for the user's question, you can use the tool.
@@ -206,7 +202,9 @@ async function processChunks(
   userId: string,
   totalInputTokens: number = 0,
   totalOutputTokens: number = 0,
-  isTopLevelCall: boolean = true  // New parameter
+  isTopLevelCall: boolean = true,
+  inputCost: number,
+  outputCost: number
 ) {
   let isClosed = false;
   let currentToolUse: any = null;
@@ -332,7 +330,9 @@ async function processChunks(
               userId,
               totalInputTokens,
               totalOutputTokens,
-              false  // This is not the top-level call
+              false,
+              inputCost,
+              outputCost
             );
           }
 
@@ -365,9 +365,9 @@ async function processChunks(
     console.log("Stream processing completed!");
 
     // Calculate and log totals
-    const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
-    const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
-    const totalCost = inputCost + outputCost;
+    const inputTotalCost = (totalInputTokens / 1_000_000) * inputCost;
+    const outputTotalCost = (totalOutputTokens / 1_000_000) * outputCost;
+    const totalCost = inputTotalCost + outputTotalCost;
 
     console.log(`Total input tokens: ${totalInputTokens}`);
     console.log(`Total output tokens: ${totalOutputTokens}`);
@@ -382,8 +382,8 @@ async function processChunks(
             `data: ${JSON.stringify({
               totalInputTokens,
               totalOutputTokens,
-              inputCost,
-              outputCost,
+              inputCost: inputTotalCost,
+              outputCost: outputTotalCost,
               totalCost,
             })}\n\n`
           )
@@ -445,6 +445,9 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const messages = JSON.parse(formData.get("messages") as string);
+  const selectedModel = formData.get("model") as string;
+  const inputCost = parseFloat(formData.get("inputCost") as string);
+  const outputCost = parseFloat(formData.get("outputCost") as string);
   const files = formData.getAll("files") as File[];
 
   const fileContent = await processFiles(files);
@@ -455,7 +458,7 @@ export async function POST(req: NextRequest) {
   const anthropicMessages = prepareAnthropicMessages(messages);
 
   const stream = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20240620",
+    model: selectedModel,
     max_tokens: 3000,
     temperature: 0,
     messages: anthropicMessages,
@@ -477,9 +480,11 @@ export async function POST(req: NextRequest) {
           controller,
           supabase,
           user?.id || "",
-          0,  // totalInputTokens
-          0,  // totalOutputTokens
-          true  // This is the top-level call
+          0,
+          0,
+          true,
+          inputCost,
+          outputCost
         );
       } catch (error) {
         console.error("Error in stream processing:", error);

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/tooltip";
 import FileItem from "./file-item";
 import Link from "next/link";
+import { useModelStore } from '@/components/model-selector'
 
 interface Message {
   role: "user" | "assistant";
@@ -95,6 +96,7 @@ export default function Chat() {
   const [showSignInButton, setShowSignInButton] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [toolCallInProgress, setToolCallInProgress] = useState(false);
+  const { selectedModel, reasoningModel, inputCost, outputCost } = useModelStore()
 
   useEffect(() => {
     scrollToBottom();
@@ -136,10 +138,19 @@ export default function Chat() {
 
     const formData = new FormData();
     formData.append("messages", JSON.stringify(updatedMessages));
+    formData.append("model", selectedModel);
+    formData.append("reasoningModel", reasoningModel.toString());
+    formData.append("inputCost", inputCost.toString());
+    formData.append("outputCost", outputCost.toString());
     attachedFiles.forEach((file) => formData.append("files", file));
 
     try {
-      const res = await fetch("/api/openai-request", {
+      // Determine API route based on model
+      const apiRoute = selectedModel.includes('claude') 
+        ? '/api/anthropic'
+        : '/api/openai-request'
+
+      const res = await fetch(apiRoute, {
         method: "POST",
         body: formData,
       });
