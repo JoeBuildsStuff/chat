@@ -26,16 +26,7 @@ import {
 import FileItem from "./file-item";
 import Link from "next/link";
 import { useModelStore } from '@/components/model-selector'
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  inputCost?: number;
-  outputCost?: number;
-  totalCost?: number; // Add this line
-}
+import { useChatStore, type Message } from "@/store/chat-store";
 
 interface CodeBlockProps {
   language: string;
@@ -90,7 +81,9 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
 
 export default function Chat() {
   const [inputMessage, setInputMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const messages = useChatStore((state) => state.messages);
+  const setMessages = useChatStore((state) => state.setMessages);
+  
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showSignInButton, setShowSignInButton] = useState(false);
@@ -159,7 +152,7 @@ export default function Chat() {
         setMessages((prevMessages) => [
           ...prevMessages,
           {
-            role: "assistant",
+            role: "assistant" as const,
             content: "Hold on! I need you to log in first before I can help.",
           },
         ]);
@@ -188,7 +181,7 @@ export default function Chat() {
       setMessages((prevMessages) => [
         ...prevMessages,
         {
-          role: "assistant",
+          role: "assistant" as const,
           content: "",
           inputTokens: 0,
           outputTokens: 0,
@@ -238,8 +231,7 @@ export default function Chat() {
 
                 setMessages((prevMessages) => {
                   const updatedMessages = [...prevMessages];
-                  const lastMessage =
-                    updatedMessages[updatedMessages.length - 1];
+                  const lastMessage = updatedMessages[updatedMessages.length - 1];
                   lastMessage.inputTokens = accumulatedCost.inputTokens;
                   lastMessage.outputTokens = accumulatedCost.outputTokens;
                   lastMessage.inputCost = accumulatedCost.inputCost;
@@ -252,8 +244,7 @@ export default function Chat() {
 
               setMessages((prevMessages) => {
                 const updatedMessages = [...prevMessages];
-                updatedMessages[updatedMessages.length - 1].content =
-                  aiResponse;
+                updatedMessages[updatedMessages.length - 1].content = aiResponse;
                 return updatedMessages;
               });
             } catch (error) {
@@ -268,7 +259,7 @@ export default function Chat() {
         setMessages((prevMessages) => [
           ...prevMessages,
           {
-            role: "assistant",
+            role: "assistant" as const,
             content: "An error occurred while sending the message.",
           },
         ]);
