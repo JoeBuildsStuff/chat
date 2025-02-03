@@ -139,7 +139,7 @@ export default function Chat() {
     attachedFiles.forEach((file) => formData.append("files", file));
 
     try {
-      const res = await fetch("/api/anthropic", {
+      const res = await fetch("/api/openai-request", {
         method: "POST",
         body: formData,
       });
@@ -214,6 +214,9 @@ export default function Chat() {
               } else if (parsedData.type === "tool_payload") {
                 aiResponse += `${parsedData.payload}`;
                 // Keep toolCallInProgress true here
+              } else if (parsedData.type === "tool_result") {
+                aiResponse += `\n\nResult: ${parsedData.result}\n\n`;
+                setToolCallInProgress(false);
               } else if (parsedData.totalCost !== undefined) {
                 // Accumulate costs
                 accumulatedCost.inputTokens += parsedData.totalInputTokens;

@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { createClient } from "@/utils/supabase/server";
+import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 
 export const runtime = "edge";
 
 // Define cost constants
-const INPUT_TOKEN_COST = 3; // Cost per 1,000,000 input tokens
-const OUTPUT_TOKEN_COST = 15; // Cost per 1,000,000 output tokens
+const INPUT_TOKEN_COST = .15; // Cost per 1,000,000 input tokens
+const OUTPUT_TOKEN_COST = .6; // Cost per 1,000,000 output tokens
 
 // Define the system message for role prompting
 const SYSTEM_MESSAGE = `You are an AI assistant. You are free to answer questions with or without the tools.  You do not need to remind the user
@@ -27,6 +28,7 @@ type ToolSchema = {
     description: string 
   }>;
   required: string[];
+  additionalProperties: boolean;
 };
 
 type Tool = {
@@ -54,6 +56,7 @@ const tools: Tool[] = [
         },
       },
       required: ["min", "max"],
+      additionalProperties: false
     },
     handler: async ({ min, max }: { min: number; max: number }) => {
       console.log(`Generating random number between ${min} and ${max}`);
@@ -68,6 +71,7 @@ const tools: Tool[] = [
       type: "object",
       properties: {},
       required: [],
+      additionalProperties: false
     },
     handler: async () => {
       const now = new Date();
@@ -85,6 +89,7 @@ const tools: Tool[] = [
         url: { type: "string", description: "The URL to retrieve the content from." },
       },
       required: ["url"],
+      additionalProperties: false
     },
     handler: async ({ url }: { url: string }) => {
       console.log("Summarizing URL:", url);
@@ -119,6 +124,7 @@ const tools: Tool[] = [
         query: { type: "string", description: "The search query to perform." },
       },
       required: ["query"],
+      additionalProperties: false
     },
     handler: async ({ query }: { query: string }) => {
       console.log("Performing Jina search for:", query);
@@ -146,11 +152,15 @@ const tools: Tool[] = [
   },
 ];
 
-// Convert tools to Anthropic format
-const anthropicTools: Anthropic.Messages.Tool[] = tools.map((tool) => ({
-  name: tool.name,
-  description: tool.description,
-  input_schema: tool.schema,
+// Convert tools to OpenAI format
+const OpenAITools: ChatCompletionTool[] = tools.map((tool) => ({
+  type: "function" as const,
+  function: {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.schema,
+    strict: true
+  }
 }));
 
 async function processFiles(files: File[]): Promise<string> {
@@ -198,164 +208,174 @@ async function updateUserCost(
 
 async function processChunks(
   stream: AsyncIterable<any>,
-  anthropic: Anthropic,
-  anthropicMessages: any[],
+  openai: OpenAI,
+  openaiMessages: any[],
   encoder: TextEncoder,
   controller: ReadableStreamDefaultController,
   supabase: ReturnType<typeof createClient>,
   userId: string,
   totalInputTokens: number = 0,
   totalOutputTokens: number = 0,
-  isTopLevelCall: boolean = true  // New parameter
+  isTopLevelCall: boolean = true
 ) {
   let isClosed = false;
-  let currentToolUse: any = null;
+  let currentToolUse: string | null = null;
   let currentToolInput = "";
   let currentResponseText = "";
 
   try {
     for await (const chunk of stream) {
       console.log("chunk", chunk);
-      if (chunk.type === "message_start") {
-        totalInputTokens += chunk.message.usage.input_tokens;
-        console.log(`Message start: input tokens = ${totalInputTokens}`);
-      } else if (chunk.type === "message_delta") {
-        totalOutputTokens += chunk.usage.output_tokens;
-        console.log(`Message delta: output tokens = ${totalOutputTokens}`);
+
+      if (!chunk?.choices?.length) {
+        continue;
       }
 
-      if (
-        chunk.type === "content_block_delta" &&
-        chunk.delta.type === "text_delta"
-      ) {
-        currentResponseText += chunk.delta.text;
-        console.log(`Text delta: ${chunk.delta.text}`);
+      const choice = chunk.choices[0];
+      const delta = choice.delta;
+      const finishReason = choice.finish_reason;
+
+      // Handle regular content
+      if (delta?.content) {
+        currentResponseText += delta.content;
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(chunk.delta.text)}\n\n`)
+          encoder.encode(`data: ${JSON.stringify(delta.content)}\n\n`)
         );
       }
 
-      if (
-        chunk.type === "content_block_start" &&
-        chunk.content_block.type === "tool_use"
-      ) {
-        currentToolUse = chunk.content_block;
-        currentToolInput = "";
-        console.log(`Tool use started: ${currentToolUse.name}`);
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "tool_call",
-              tool: currentToolUse.name,
-            })}\n\n`
-          )
-        );
-      } else if (
-        chunk.type === "content_block_delta" &&
-        chunk.delta.type === "input_json_delta"
-      ) {
-        currentToolInput += chunk.delta.partial_json;
-        console.log(`Input JSON delta: ${chunk.delta.partial_json}`);
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "tool_payload",
-              payload: chunk.delta.partial_json,
-            })}\n\n`
-          )
-        );
-      } else if (chunk.type === "content_block_stop" && currentToolUse) {
-        try {
-          console.log(`Tool use stopped: ${currentToolUse.name}`);
-          const toolInput = currentToolInput ? JSON.parse(currentToolInput) : {};
-          const tool = tools.find((t) => t.name === currentToolUse.name);
-
-          if (tool) {
-            console.log(`Executing tool handler: ${tool.name}`);
-            const toolResult = await tool.handler(toolInput, userId);
-            console.log(`Tool result: ${toolResult}`);
-
-            // Stream tool result to client
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "tool_result",
-                  tool: currentToolUse.name,
-                  result: toolResult,
-                })}\n\n`
-              )
-            );
-
-            anthropicMessages.push({
-              role: "assistant",
-              content: [
-                { type: "text", text: currentResponseText },
-                {
-                  type: currentToolUse.type,
-                  id: currentToolUse.id,
-                  name: currentToolUse.name,
-                  input: toolInput,
-                },
-              ],
-            });
-
-            anthropicMessages.push({
-              role: "user",
-              content: [
-                {
-                  type: "tool_result",
-                  tool_use_id: currentToolUse.id,
-                  content: toolResult,
-                },
-              ],
-            });
-
-            console.log(`Updated messages: ${JSON.stringify(anthropicMessages)}`);
-
-            // Create a new message to process the tool result
-            const toolResultResponse = await anthropic.messages.create({
-              model: "claude-3-5-sonnet-20240620",
-              max_tokens: 1000,
-              messages: anthropicMessages,
-              stream: true,
-              tools: anthropicTools,
-            });
-
-            // Process the new message stream
-            await processChunks(
-              toolResultResponse,
-              anthropic,
-              anthropicMessages,
-              encoder,
-              controller,
-              supabase,
-              userId,
-              totalInputTokens,
-              totalOutputTokens,
-              false  // This is not the top-level call
-            );
-          }
-
+      // Handle tool calls (updated from function_call)
+      if (delta?.tool_calls?.length > 0) {
+        const toolCall = delta.tool_calls[0];
+        
+        // If we have a new tool call
+        if (toolCall.function?.name) {
+          currentToolUse = toolCall.function.name;
+          console.log(`Tool use started: ${currentToolUse}`);
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
-                type: "tool_finished",
-                tool: currentToolUse.name,
-              })}\n\n`
-            )
-          );
-        } catch (error) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "tool_error",
-                tool: currentToolUse.name,
-                error: error instanceof Error ? error.message : String(error),
+                type: "tool_call",
+                tool: currentToolUse,
               })}\n\n`
             )
           );
         }
 
+        // If we have arguments
+        if (toolCall.function?.arguments) {
+          currentToolInput += toolCall.function.arguments;
+          console.log(`Tool call argument delta: ${toolCall.function.arguments}`);
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "tool_payload",
+                payload: toolCall.function.arguments,
+              })}\n\n`
+            )
+          );
+        }
+      }
+
+      // Handle finish conditions
+      if (finishReason === "tool_calls") {  // Updated from 'stop'
+        console.log("OpenAI stream indicates tool call completion");
+        // If we have an open tool call, let's try to handle it
+        if (currentToolUse) {
+          try {
+            console.log(`Tool use stopped: ${currentToolUse}`);
+            // Attempt to parse the collected arguments
+            const toolInput = currentToolInput
+              ? JSON.parse(currentToolInput)
+              : {};
+            const tool = tools.find((t) => t.name === currentToolUse);
+
+            if (tool) {
+              console.log(`Executing tool handler: ${tool.name}`);
+              const toolResult = await tool.handler(toolInput, userId);
+              console.log(`Tool result: ${toolResult}`);
+
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "tool_result",
+                    tool: currentToolUse,
+                    result: toolResult,
+                  })}\n\n`
+                )
+              );
+
+              // Add this conversation step so the assistant can respond after the tool call
+              openaiMessages.push({
+                role: "assistant",
+                content: [
+                  { type: "text", text: currentResponseText },
+                  {
+                    type: "function_call",
+                    name: currentToolUse,
+                    input: toolInput,
+                  },
+                ],
+              });
+
+              openaiMessages.push({
+                role: "user",
+                content: [
+                  {
+                    type: "tool_result",
+                    content: toolResult,
+                  },
+                ],
+              });
+
+              console.log(`Updated messages: ${JSON.stringify(openaiMessages)}`);
+
+              // Send the tool result back to the model for a follow-up
+              const toolResultResponse = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                max_tokens: 1000,
+                messages: openaiMessages,
+                stream: true,
+                tools: OpenAITools,
+              });
+
+              // Process the new chunked response (may or may not contain more text)
+              await processChunks(
+                toolResultResponse,
+                openai,
+                openaiMessages,
+                encoder,
+                controller,
+                supabase,
+                userId,
+                totalInputTokens,
+                totalOutputTokens,
+                false
+              );
+
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "tool_finished",
+                    tool: currentToolUse,
+                  })}\n\n`
+                )
+              );
+            }
+          } catch (error) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "tool_error",
+                  tool: currentToolUse,
+                  error:
+                    error instanceof Error ? error.message : String(error),
+                })}\n\n`
+              )
+            );
+          }
+        }
+
+        // Reset tool info because we used it
         currentToolUse = null;
         currentToolInput = "";
         currentResponseText = "";
@@ -364,7 +384,9 @@ async function processChunks(
 
     console.log("Stream processing completed!");
 
-    // Calculate and log totals
+    // Example usage/metering for final cost
+    // (OpenAI's streaming chunks do not return usage. 
+    // You may do a separate usage check or capture usage from the final response.)
     const inputCost = (totalInputTokens / 1_000_000) * INPUT_TOKEN_COST;
     const outputCost = (totalOutputTokens / 1_000_000) * OUTPUT_TOKEN_COST;
     const totalCost = inputCost + outputCost;
@@ -375,7 +397,10 @@ async function processChunks(
 
     if (!isClosed) {
       try {
-        await updateUserCost(supabase, userId, totalCost);
+        if (userId) {
+          await updateUserCost(supabase, userId, totalCost);
+        }
+
         console.log("Attempting to enqueue final cost data");
         controller.enqueue(
           encoder.encode(
@@ -392,7 +417,7 @@ async function processChunks(
         console.error("Error enqueuing final cost data:", error);
       }
 
-      // Only send DONE message and close controller if this is the top-level call
+      // Only send DONE and close if we're the top-level call
       if (isTopLevelCall) {
         try {
           console.log("Attempting to enqueue DONE message");
@@ -430,18 +455,18 @@ async function processChunks(
 }
 
 export async function POST(req: NextRequest) {
-  console.log("new request");
+  console.log("new request openai-request");
   const supabase = createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // if (!user) {
-  //   return new Response("Unauthorized", { status: 401 });
-  // }
+//   if (!user) {
+//     return new Response("Unauthorized", { status: 401 });
+//   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const formData = await req.formData();
   const messages = JSON.parse(formData.get("messages") as string);
@@ -452,16 +477,18 @@ export async function POST(req: NextRequest) {
   lastUserMessage.content += "\n\n" + fileContent;
 
   // Prepare messages for Anthropic API
-  const anthropicMessages = prepareAnthropicMessages(messages);
+  const openaiMessages = prepareOpenAIMessages(messages);
 
-  const stream = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20240620",
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
     max_tokens: 3000,
     temperature: 0,
-    messages: anthropicMessages,
+    messages: [
+      { role: "system", content: SYSTEM_MESSAGE },
+      ...openaiMessages
+    ],
     stream: true,
-    tools: anthropicTools,
-    system: SYSTEM_MESSAGE,
+    tools: OpenAITools,
   });
 
   const encoder = new TextEncoder();
@@ -471,8 +498,8 @@ export async function POST(req: NextRequest) {
       try {
         await processChunks(
           stream,
-          anthropic,
-          anthropicMessages,
+          openai,
+          openaiMessages,
           encoder,
           controller,
           supabase,
@@ -498,19 +525,18 @@ export async function POST(req: NextRequest) {
     },
   });
 }
-
-function prepareAnthropicMessages(messages: any[]): Anthropic.Messages.MessageParam[] {
-  const anthropicMessages: Anthropic.Messages.MessageParam[] = [];
+function prepareOpenAIMessages(messages: any[]): OpenAI.Chat.ChatCompletionMessageParam[] {
+  const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
   
   for (const message of messages) {
     if (message.role === "user") {
-      anthropicMessages.push({
+      openaiMessages.push({
         role: "user",
         content: [{ type: "text", text: message.content }],
       });
     } else if (message.role === "assistant") {
       // Combine all assistant messages into a single message
-      const lastAssistantMessage = anthropicMessages[anthropicMessages.length - 1];
+      const lastAssistantMessage = openaiMessages[openaiMessages.length - 1];
       if (lastAssistantMessage && lastAssistantMessage.role === "assistant") {
         if (Array.isArray(lastAssistantMessage.content)) {
           lastAssistantMessage.content.push({ type: "text", text: message.content });
@@ -521,7 +547,7 @@ function prepareAnthropicMessages(messages: any[]): Anthropic.Messages.MessagePa
           ];
         }
       } else {
-        anthropicMessages.push({
+        openaiMessages.push({
           role: "assistant",
           content: [{ type: "text", text: message.content }],
         });
@@ -529,5 +555,5 @@ function prepareAnthropicMessages(messages: any[]): Anthropic.Messages.MessagePa
     }
   }
 
-  return anthropicMessages;
+  return openaiMessages;
 }

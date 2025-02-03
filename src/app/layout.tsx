@@ -77,13 +77,13 @@ export default async function RootLayout({
             </SidebarProvider>
           ) : (
             <div className="flex flex-1 flex-col">
-              <div className="flex flex-row justify-between items-center">
-              <div className="flex flex-row items-center gap-2 flex-grow ">
-                <NewChatButton />
-                <ModelSelector />
+              <header className="flex flex-row justify-between items-center mx-4 mt-2">
+                <div className="flex flex-row items-center gap-2 flex-grow ">
+                  <NewChatButton />
+                  <ModelSelector />
                 </div>
                 <SocialLinks />
-              </div>
+              </header>
               {children}
               <Toaster />
             </div>
