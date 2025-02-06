@@ -27,6 +27,9 @@ import FileItem from "./file-item";
 import Link from "next/link";
 import { useModelStore } from '@/components/model-selector'
 import { useChatStore, type Message } from "@/store/chat-store";
+import { createClient } from '@/utils/supabase/client';
+import { useRouter } from "next/navigation";
+import { generateChatTitle } from '@/utils/generateChatTitle';
 
 interface CodeBlockProps {
   language: string;
@@ -79,10 +82,16 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, value }) => {
   );
 };
 
-export default function Chat() {
+interface ChatProps {
+  chatId?: string;
+  isRootPage?: boolean;
+}
+
+export default function Chat({ chatId, isRootPage }: ChatProps) {
+
   const [inputMessage, setInputMessage] = useState("");
-  const messages = useChatStore((state) => state.messages);
-  const setMessages = useChatStore((state) => state.setMessages);
+  const { messages, setMessages, currentChatId, setCurrentChatId, saveMessage, createNewChat } = useChatStore();
+  const supabase = createClient();
   
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -91,9 +100,26 @@ export default function Chat() {
   const [toolCallInProgress, setToolCallInProgress] = useState(false);
   const { selectedModel, reasoningModel, inputCost, outputCost } = useModelStore()
 
+  const router = useRouter();
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const initializeChat = async () => {
+      // Only initialize chat if we have a chatId but no currentChatId
+      if (chatId && !currentChatId) {
+        try {
+          setCurrentChatId(chatId);
+        } catch (error) {
+          console.error("Error initializing chat:", error);
+        }
+      }
+    };
+
+    initializeChat();
+  }, [chatId, currentChatId, setCurrentChatId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -123,21 +149,61 @@ export default function Chat() {
     e.preventDefault();
     if (!inputMessage.trim() && attachedFiles.length === 0) return;
 
-    setIsLoading(true);
-    const userMessage: Message = { role: "user", content: inputMessage };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setInputMessage("");
-
-    const formData = new FormData();
-    formData.append("messages", JSON.stringify(updatedMessages));
-    formData.append("model", selectedModel);
-    formData.append("reasoningModel", reasoningModel.toString());
-    formData.append("inputCost", inputCost.toString());
-    formData.append("outputCost", outputCost.toString());
-    attachedFiles.forEach((file) => formData.append("files", file));
-
     try {
+      // Create a new chat when on root page and no active chat exists
+      if (isRootPage && !currentChatId) {
+        // Create the chat with a temporary title
+        const newChatId = await createNewChat(supabase);
+        setCurrentChatId(newChatId);
+
+        // Immediately generate a title from the user's initial input
+        // (You might later decide to include more context such as the AI response)
+        const title = await generateChatTitle(inputMessage);
+
+        // Update the chat record with the proposed title
+        const { error: updateError } = await supabase
+          .from('chatbot_chats')
+          .update({ title: title.title })
+          .eq('id', newChatId);
+
+        if (updateError) {
+          console.error('Error updating chat title:', updateError);
+        }
+
+        // Process the message and update our chat history
+        const userMessage: Message = { role: "user", content: inputMessage };
+        await saveMessage(supabase, userMessage);
+        setMessages([userMessage]);
+
+        // Then handle the AI assistant response as existing
+        await processAIResponse(userMessage);
+
+        // Finally, navigate to the new chat page using the new chat id
+        router.push(`/chat/${newChatId}`);
+        return;
+      }
+
+      // Ensure we have a chat before proceeding
+      if (!currentChatId) {
+        await createNewChat(supabase);
+      }
+
+      setIsLoading(true);
+      const userMessage: Message = { role: "user", content: inputMessage };
+
+      await saveMessage(supabase, userMessage);
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+      setInputMessage("");
+
+      const formData = new FormData();
+      formData.append("messages", JSON.stringify(updatedMessages));
+      formData.append("model", selectedModel);
+      formData.append("reasoningModel", reasoningModel.toString());
+      formData.append("inputCost", inputCost.toString());
+      formData.append("outputCost", outputCost.toString());
+      attachedFiles.forEach((file) => formData.append("files", file));
+
       // Determine API route based on model
       const apiRoute = selectedModel.includes('claude') 
         ? '/api/anthropic'
@@ -253,20 +319,159 @@ export default function Chat() {
           }
         }
       }
-    } catch (error) {
-      console.error("Error:", error);
-      if ((error as Error).message !== "Unauthorized") {
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            role: "assistant" as const,
-            content: "An error occurred while sending the message.",
-          },
-        ]);
+
+      // Save assistant message after receiving response
+      if (aiResponse) {
+        await saveMessage(supabase, {
+          role: "assistant",
+          content: aiResponse,
+          inputTokens: accumulatedCost.inputTokens,
+          outputTokens: accumulatedCost.outputTokens,
+          inputCost: accumulatedCost.inputCost,
+          outputCost: accumulatedCost.outputCost,
+          totalCost: accumulatedCost.totalCost
+        });
       }
+    } catch (error) {
+      console.error("Error in handleSubmit:", error);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          role: "assistant" as const,
+          content: "An error occurred while sending the message.",
+        },
+      ]);
     } finally {
       setIsLoading(false);
       setAttachedFiles([]);
+    }
+  };
+
+  // Helper function to process AI response
+  const processAIResponse = async (userMessage: Message) => {
+    const formData = new FormData();
+    formData.append("messages", JSON.stringify([userMessage]));
+    formData.append("model", selectedModel);
+    formData.append("reasoningModel", reasoningModel.toString());
+    formData.append("inputCost", inputCost.toString());
+    formData.append("outputCost", outputCost.toString());
+    attachedFiles.forEach((file) => formData.append("files", file));
+
+    const apiRoute = selectedModel.includes('claude') 
+      ? '/api/anthropic'
+      : '/api/openai-request';
+
+    const res = await fetch(apiRoute, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to send message");
+    }
+
+    // Process the streaming response
+    const reader = res.body?.getReader();
+    if (!reader) {
+      throw new Error("No reader available");
+    }
+
+    let aiResponse = "";
+    let accumulatedCost = {
+      inputTokens: 0,
+      outputTokens: 0,
+      inputCost: 0,
+      outputCost: 0,
+      totalCost: 0,
+    };
+
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      {
+        role: "assistant" as const,
+        content: "",
+        inputTokens: 0,
+        outputTokens: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: 0,
+      },
+    ]);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = new TextDecoder().decode(value);
+
+      const lines = chunk.split("\n\n");
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            setIsLoading(false);
+            setToolCallInProgress(false);
+            break;
+          }
+          try {
+            const parsedData = JSON.parse(data);
+            console.log("parsedData", parsedData);
+            if (typeof parsedData === "string") {
+              aiResponse += parsedData;
+              setToolCallInProgress(false);
+            } else if (parsedData.type === "tool_call") {
+              aiResponse += `\n\n\`Tool call: ${parsedData.tool}\`\n\n`;
+              setToolCallInProgress(true);
+            } else if (parsedData.type === "tool_payload") {
+              aiResponse += `${parsedData.payload}`;
+              // Keep toolCallInProgress true here
+            } else if (parsedData.type === "tool_result") {
+              aiResponse += `\n\nResult: ${parsedData.result}\n\n`;
+              setToolCallInProgress(false);
+            } else if (parsedData.totalCost !== undefined) {
+              // Accumulate costs
+              accumulatedCost.inputTokens += parsedData.totalInputTokens;
+              accumulatedCost.outputTokens += parsedData.totalOutputTokens;
+              accumulatedCost.inputCost += parsedData.inputCost;
+              accumulatedCost.outputCost += parsedData.outputCost;
+              accumulatedCost.totalCost += parsedData.totalCost;
+
+              setMessages((prevMessages) => {
+                const updatedMessages = [...prevMessages];
+                const lastMessage = updatedMessages[updatedMessages.length - 1];
+                lastMessage.inputTokens = accumulatedCost.inputTokens;
+                lastMessage.outputTokens = accumulatedCost.outputTokens;
+                lastMessage.inputCost = accumulatedCost.inputCost;
+                lastMessage.outputCost = accumulatedCost.outputCost;
+                lastMessage.totalCost = accumulatedCost.totalCost;
+                return updatedMessages;
+              });
+              setToolCallInProgress(false);
+            }
+
+            setMessages((prevMessages) => {
+              const updatedMessages = [...prevMessages];
+              updatedMessages[updatedMessages.length - 1].content = aiResponse;
+              return updatedMessages;
+            });
+          } catch (error) {
+            console.error("Error parsing data:", error);
+          }
+        }
+      }
+    }
+
+    // Save assistant message after receiving response
+    if (aiResponse) {
+      await saveMessage(supabase, {
+        role: "assistant",
+        content: aiResponse,
+        inputTokens: accumulatedCost.inputTokens,
+        outputTokens: accumulatedCost.outputTokens,
+        inputCost: accumulatedCost.inputCost,
+        outputCost: accumulatedCost.outputCost,
+        totalCost: accumulatedCost.totalCost
+      });
     }
   };
 

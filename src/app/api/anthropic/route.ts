@@ -437,9 +437,9 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // if (!user) {
-  //   return new Response("Unauthorized", { status: 401 });
-  // }
+  if (!user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

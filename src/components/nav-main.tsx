@@ -29,6 +29,8 @@ export function NavMain({
     items?: {
       title: string
       url: string
+      isActive?: boolean
+      onClick?: () => void
     }[]
   }[]
 }) {
@@ -55,10 +57,18 @@ export function NavMain({
                 <SidebarMenuSub>
                   {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild>
-                        <a href={subItem.url}>
+                      <SidebarMenuSubButton
+                        asChild
+                        className={subItem.isActive ? 'bg-secondary' : ''}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            subItem.onClick?.();
+                          }}
+                        >
                           <span>{subItem.title}</span>
-                        </a>
+                        </button>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

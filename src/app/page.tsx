@@ -9,7 +9,7 @@ export default async function Home() {
   return (
     <main className="">
       <div className="mx-8">
-      <Chat />
+      <Chat isRootPage={true} />
       </div>
       <AuthAlert isOpen={!user} />
     </main>

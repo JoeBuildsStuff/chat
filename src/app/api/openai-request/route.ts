@@ -462,9 +462,9 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-//   if (!user) {
-//     return new Response("Unauthorized", { status: 401 });
-//   }
+  if (!user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
