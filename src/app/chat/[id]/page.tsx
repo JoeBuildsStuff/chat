@@ -12,7 +12,7 @@ export default async function ChatPage({
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/signin')
+    redirect('/login')
   }
 
   // Verify chat exists and belongs to user

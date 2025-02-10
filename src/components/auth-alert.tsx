@@ -43,7 +43,7 @@ export function AuthAlert({ isOpen }: AuthAlertProps) {
         <AlertDialogFooter className="items-center justify-center mx-auto">
           <div className="flex flex-col gap-4 ">
             <AlertDialogAction asChild className="">
-              <Link href="/signin">Log in</Link>
+              <Link href="/login">Log in</Link>
             </AlertDialogAction>
             <AlertDialogCancel asChild className="border-none underline" onClick={handleStayLoggedOut}>
               <button>Stay logged out</button>

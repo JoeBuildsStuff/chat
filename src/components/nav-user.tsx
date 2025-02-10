@@ -64,7 +64,7 @@ export function NavUser({
       setIsLoggingOut(true)
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      router.push('/signin') // Redirect to login page after logout
+      router.push('/login') // Redirect to login page after logout
     } catch (error) {
       console.error('Error logging out:', error)
     } finally {

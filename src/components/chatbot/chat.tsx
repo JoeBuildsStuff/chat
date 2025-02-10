@@ -572,7 +572,7 @@ export default function Chat({ chatId, isRootPage }: ChatProps) {
                           asChild
                           className=" text-white bg-violet-600 hover:bg-violet-500 dark:bg-violet-700 dark:hover:bg-violet-800"
                         >
-                          <Link href="/signin">Sign in</Link>
+                          <Link href="/login">Sign in</Link>
                         </Button>
                       </div>
                     )}
