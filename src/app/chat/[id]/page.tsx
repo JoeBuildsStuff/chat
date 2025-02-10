@@ -32,10 +32,11 @@ async function fetchAndVerifyChat(chatId: string, userId: string): Promise<ChatD
 }
 
 export default async function ChatPage({
-  params
+  params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params;
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -43,7 +44,7 @@ export default async function ChatPage({
     redirect('/login')
   }
 
-  const chat = await fetchAndVerifyChat(params.id, user.id);
+  const chat = await fetchAndVerifyChat(id, user.id);
   
   if (!chat) {
     redirect('/')
@@ -52,7 +53,7 @@ export default async function ChatPage({
   return (
     <main className="">
       <div className="mx-8">
-        <Chat chatId={params.id} isRootPage={false} />
+        <Chat chatId={id} isRootPage={false} />
       </div>
       <AuthAlert isOpen={!user} />
     </main>
