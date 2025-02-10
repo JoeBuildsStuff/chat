@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/utils/supabase/server";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "edge";
 
@@ -160,7 +161,7 @@ async function processFiles(files: File[]): Promise<string> {
 }
 
 async function updateUserCost(
-  supabase: ReturnType<typeof createClient>, // Add this parameter
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   totalCost: number
 ): Promise<void> {
@@ -175,11 +176,8 @@ async function updateUserCost(
     if (error) throw error
 
     const currentCost = data?.api_cost_chat || 0
-
-    // Add total cost to current cost
     const updatedCost = currentCost + totalCost
 
-    // Update user cost in the database
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ api_cost_chat: updatedCost })
@@ -188,7 +186,7 @@ async function updateUserCost(
     if (updateError) throw updateError
   } catch (error) {
     console.error("Error updating user API cost:", error)
-    throw error  // Re-throw the error for the caller to handle if needed
+    throw error
   }
 }
 
@@ -198,7 +196,7 @@ async function processChunks(
   anthropicMessages: any[],
   encoder: TextEncoder,
   controller: ReadableStreamDefaultController,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   totalInputTokens: number = 0,
   totalOutputTokens: number = 0,
@@ -431,11 +429,11 @@ async function processChunks(
 
 export async function POST(req: NextRequest) {
   console.log("new request");
-  const supabase = createClient();
+  const supabaseClient = await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseClient.auth.getUser();
 
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
@@ -478,7 +476,7 @@ export async function POST(req: NextRequest) {
           anthropicMessages,
           encoder,
           controller,
-          supabase,
+          supabaseClient,
           user?.id || "",
           0,
           0,
