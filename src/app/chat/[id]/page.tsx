@@ -1,7 +1,35 @@
+'use server'
+
 import Chat from "@/components/chatbot/chat";
 import { createClient } from '@/utils/supabase/server'
 import { AuthAlert } from "@/components/auth-alert";
 import { redirect } from 'next/navigation';
+
+// Define the type for chat data
+type ChatData = {
+  id: string;
+  user_id: string;
+  // add other chat fields as needed
+}
+
+// Server action to fetch and verify chat
+async function fetchAndVerifyChat(chatId: string, userId: string): Promise<ChatData | null> {
+  const supabase = await createClient()
+  
+  const { data: chat, error } = await supabase
+    .from('chatbot_chats')
+    .select('*')
+    .eq('id', chatId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !chat) {
+    console.error('Chat not found or does not belong to user:', error)
+    return null;
+  }
+
+  return chat;
+}
 
 export default async function ChatPage({
   params
@@ -15,16 +43,9 @@ export default async function ChatPage({
     redirect('/login')
   }
 
-  // Verify chat exists and belongs to user
-  const { data: chat, error } = await supabase
-    .from('chatbot_chats')
-    .select('*')
-    .eq('id', params.id)
-    .eq('user_id', user.id)
-    .single();
-
-  if (error || !chat) {
-    console.error('Chat not found or does not belong to user:', error)
+  const chat = await fetchAndVerifyChat(params.id, user.id);
+  
+  if (!chat) {
     redirect('/')
   }
 
