@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronRight, type LucideIcon } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 
 import {
   Collapsible,
@@ -18,22 +19,38 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
+interface Chat {
+  id: string
+  user_id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
 export function NavMain({
-  items,
+  chats,
 }: {
-  items: {
-    title: string
-    url: string
-    icon?: LucideIcon
-    isActive?: boolean
-    items?: {
-      title: string
-      url: string
-      isActive?: boolean
-      onClick?: () => void
-    }[]
-  }[]
+  chats: Chat[]
 }) {
+  // Transform chats into the structure we need
+  const items = [
+    {
+      title: "All Chats",
+      url: "/chats",
+      icon: MessageSquare,
+      items: chats.map(chat => ({
+        title: chat.title,
+        url: `/chat/${chat.id}`,
+        // You might want to add logic here to determine if a chat is active
+        isActive: false,
+        onClick: () => {
+          // Add your chat navigation logic here
+          window.location.href = `/chat/${chat.id}`
+        }
+      }))
+    }
+  ]
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Chats</SidebarGroupLabel>
@@ -42,7 +59,7 @@ export function NavMain({
           <Collapsible
             key={item.title}
             asChild
-            defaultOpen={item.isActive}
+            defaultOpen={true}
             className="group/collapsible"
           >
             <SidebarMenuItem>
