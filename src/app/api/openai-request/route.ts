@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/utils/supabase/server";
 import type { ChatCompletionTool } from 'openai/resources/chat/completions';
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "edge";
 
@@ -170,7 +171,7 @@ async function processFiles(files: File[]): Promise<string> {
 }
 
 async function updateUserCost(
-  supabase: ReturnType<typeof createClient>, // Add this parameter
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   totalCost: number
 ): Promise<void> {
@@ -208,7 +209,7 @@ async function processChunks(
   openaiMessages: any[],
   encoder: TextEncoder,
   controller: ReadableStreamDefaultController,
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   totalInputTokens: number = 0,
   totalOutputTokens: number = 0,
@@ -456,11 +457,11 @@ async function processChunks(
 
 export async function POST(req: NextRequest) {
   console.log("new request openai-request");
-  const supabase = createClient();
+  const supabaseClient = await createClient();  // Await the client
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseClient.auth.getUser();
 
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
@@ -522,7 +523,7 @@ export async function POST(req: NextRequest) {
           openaiMessages,
           encoder,
           controller,
-          supabase,
+          supabaseClient,
           user?.id || "",
           0,
           0,
