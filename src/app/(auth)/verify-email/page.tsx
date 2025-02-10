@@ -6,16 +6,13 @@ import { ArrowLeft, MailIcon, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { signInWithMagicLink } from '@/actions/auth';
 
-//params for server page
-interface VerifyEmailPageProps {
-  searchParams: {
-    email: string;
-  };
-}
+export default async function VerifyEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
 
-export default function VerifyEmailPage({ searchParams }: VerifyEmailPageProps) {
-
-  const email = searchParams.email;
+  const { email } = await searchParams
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
